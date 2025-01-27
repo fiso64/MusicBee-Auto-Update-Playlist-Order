@@ -87,8 +87,8 @@ namespace MusicBeePlugin
         {
             if (keyData == Keys.Escape)
             {
-                OkButton_Click(this, EventArgs.Empty); // Treat Escape as OK
-                return true; // Indicate that we handled this key
+                CancelButton_Click(this, EventArgs.Empty); // Treat Escape as Cancel
+                return true;
             }
             return base.ProcessCmdKey(ref msg, keyData); // Let base class handle other keys
         }

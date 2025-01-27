@@ -41,11 +41,35 @@ namespace MusicBeePlugin
         {
             var dataPath = mbApi.Setting_GetPersistentStoragePath();
             configPath = Path.Combine(dataPath, "mb_AutoUpdatePlayOrder", "config.json");
+            
+            var oldPlaylistConfig = playlistConfig;
             LoadConfig();
 
+            var changedPlaylists = GetChangedPlaylists(oldPlaylistConfig, playlistConfig);
+
             configForm = new ConfigForm(mbApi, playlistConfig);
-            configForm.FormClosed += ConfigForm_FormClosed;
-            configForm.ShowDialog();
+
+            DialogResult result = configForm.ShowDialog();
+
+            if (result == DialogResult.OK)
+            {
+                oldPlaylistConfig = playlistConfig;
+                playlistConfig = configForm.GetPlaylistConfig();
+                SaveConfig();
+
+                changedPlaylists.UnionWith(GetChangedPlaylists(oldPlaylistConfig, playlistConfig));
+                var allPlaylists = GetAllPlaylists();
+
+                foreach (var playlistName in changedPlaylists)
+                {
+                    var playlistPath = allPlaylists.FirstOrDefault(p => p.Name == playlistName).Path;
+                    if (playlistPath != null)
+                        UpdatePlaylistPlayOrder(playlistPath, force: true);
+                }
+            }
+
+            configForm.Dispose();
+            configForm = null;
 
             return true;
         }
@@ -70,22 +94,21 @@ namespace MusicBeePlugin
             LoadConfig();
         }
 
-        private void UpdatePlaylistPlayOrder(string url)
+        private void UpdatePlaylistPlayOrder(string url, bool force = false)
         {
             if (playlistConfig.Count == 0) return;
 
             var playlistName = mbApi.Playlist_GetName(url);
             if (!playlistConfig.ContainsKey(playlistName)) return;
 
-
-            if (playlistFilePaths.TryGetValue(playlistName, out var previousFilesHashSet))
+            if (!force && playlistFilePaths.TryGetValue(playlistName, out var previousFilesHashSet))
             {
                 mbApi.Playlist_QueryFilesEx(url, out string[] currentFiles);
                 var currentFilesHashSet = new HashSet<string>(currentFiles);
                 
                 if (currentFilesHashSet.IsSubsetOf(previousFilesHashSet))
                 {
-                    return; // No new items, no need to sort
+                    return; // No new items have been added, no need to sort
                 }
             }
 
@@ -211,24 +234,7 @@ namespace MusicBeePlugin
             }
         }
 
-        private void ConfigForm_FormClosed(object sender, FormClosedEventArgs e)
-        {
-            var oldPlaylistConfig = playlistConfig;
-            playlistConfig = configForm.GetPlaylistConfig();
-            SaveConfig();
-
-            var changedPlaylists = GetChangedPlaylists(oldPlaylistConfig, playlistConfig);
-            var allPlaylists = GetAllPlaylists();
-
-            foreach (var playlistName in changedPlaylists)
-            {
-                var playlistPath = allPlaylists.FirstOrDefault(p => p.Name == playlistName).Path;
-                if (playlistPath != null)
-                    UpdatePlaylistPlayOrder(playlistPath);
-            }
-        }
-
-        private List<string> GetChangedPlaylists(Dictionary<string, List<(string Order, bool Descending)>> oldConfig, Dictionary<string, List<(string Order, bool Descending)>> newConfig)
+        private HashSet<string> GetChangedPlaylists(Dictionary<string, List<(string Order, bool Descending)>> oldConfig, Dictionary<string, List<(string Order, bool Descending)>> newConfig)
         {
             bool compareSortOrders(List<(string Order, bool Descending)> list1, List<(string Order, bool Descending)> list2)
             {
@@ -238,7 +244,7 @@ namespace MusicBeePlugin
                 return true;
             }
 
-            var changedPlaylists = new List<string>();
+            var changedPlaylists = new HashSet<string>();
 
             foreach (var playlistName in newConfig.Keys)
             {

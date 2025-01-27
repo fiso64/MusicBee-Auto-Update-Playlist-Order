@@ -46,6 +46,8 @@ Once configured, the plugin will automatically update the play order of the spec
 
 ## Installation
 
+**Note: The plugin is new and little testing has been done; it's recommended to back up your playlists first.**
+
 1.  Download the the latest release [here](https://github.com/fiso64/MusicBee-Auto-Update-Playlist-Order/releases).
 2.  Extract the files into the MusicBee Plugins folder (usually located at `MusicBee\Plugins`).
 3.  Restart MusicBee.

@@ -108,6 +108,7 @@ namespace MusicBeePlugin
                 
                 if (currentFilesHashSet.IsSubsetOf(previousFilesHashSet))
                 {
+                    playlistFilePaths[playlistName] = currentFilesHashSet;
                     return; // No new items have been added, no need to sort
                 }
             }

@@ -60,7 +60,16 @@ namespace MusicBeePlugin
                 changedPlaylists.UnionWith(GetChangedPlaylists(oldPlaylistConfig, playlistConfig));
                 var allPlaylists = GetAllPlaylists();
 
-                foreach (var playlistName in changedPlaylists)
+                if (changedPlaylists.Contains("All playlists"))
+                {
+                    foreach (var playlist in allPlaylists)
+                    {
+                        if (!playlistConfig.ContainsKey(playlist.Name))
+                            UpdatePlaylistPlayOrder(playlist.Path, force: true);
+                    }
+                }
+
+                foreach (var playlistName in changedPlaylists.Where(p => p != "All playlists"))
                 {
                     var playlistPath = allPlaylists.FirstOrDefault(p => p.Name == playlistName).Path;
                     if (playlistPath != null)
@@ -99,7 +108,7 @@ namespace MusicBeePlugin
             if (playlistConfig.Count == 0) return;
 
             var playlistName = mbApi.Playlist_GetName(url);
-            if (!playlistConfig.ContainsKey(playlistName)) return;
+            if (!playlistConfig.ContainsKey(playlistName) && !playlistConfig.ContainsKey("All playlists")) return;
 
             if (!force && playlistFilePaths.TryGetValue(playlistName, out var previousFilesHashSet))
             {
@@ -115,7 +124,6 @@ namespace MusicBeePlugin
 
             try
             {
-                Debug.WriteLine($"Updating playlist {playlistName}");
                 ProcessPlaylistUpdate(url);
             }
             catch (Exception ex)
@@ -127,10 +135,19 @@ namespace MusicBeePlugin
         private void ProcessPlaylistUpdate(string playlistUrl)
         {
             string playlistName = mbApi.Playlist_GetName(playlistUrl);
-            if (!playlistConfig.ContainsKey(playlistName)) return;
 
-            List<(string Order, bool Descending)> sortOrders = playlistConfig[playlistName];
+            List<(string Order, bool Descending)> sortOrders;
+            
+            if (playlistConfig.ContainsKey(playlistName))
+                sortOrders = playlistConfig[playlistName];
+            else if (playlistConfig.ContainsKey("All playlists"))
+                sortOrders = playlistConfig["All playlists"];
+            else
+                return;
+
             if (sortOrders.Count == 0) return;
+
+            Debug.WriteLine($"Updating playlist {playlistName} with sort order {string.Join(", ", sortOrders.Select(o => $"{o.Order}{(o.Descending ? " (desc)" : "")}"))}");
 
             mbApi.Playlist_QueryFilesEx(playlistUrl, out string[] files);
             if (files == null || files.Length == 0) return;

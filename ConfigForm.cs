@@ -101,8 +101,10 @@ namespace MusicBeePlugin
             playlistGrid.Columns.Add(new DataGridViewButtonColumn { Name = "Order", HeaderText = "Order", Text = "Configure", UseColumnTextForButtonValue = true, Width = 100 }); // Configure button, always "Configure" text
             playlistGrid.Columns.Add(new DataGridViewButtonColumn { Name = "Delete", HeaderText = "", Text = "Delete", UseColumnTextForButtonValue = true, Width = 50 });
 
-            DataGridViewComboBoxColumn playlistColumn = (DataGridViewComboBoxColumn)playlistGrid.Columns["PlaylistName"];
-            playlistColumn.DataSource = GetAllPlaylists().Select(p => p.Name).ToList();
+            var playlistColumn = (DataGridViewComboBoxColumn)playlistGrid.Columns["PlaylistName"];
+            var playlists = new List<string> { "All playlists" };
+            playlists.AddRange(GetAllPlaylists().Select(p => p.Name));
+            playlistColumn.DataSource = playlists;
             playlistColumn.DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton;
             playlistColumn.DisplayStyleForCurrentCellOnly = false; // Ensure dropdown button is always visible
 
@@ -186,8 +188,10 @@ namespace MusicBeePlugin
         {
             if (e.ColumnIndex == playlistGrid.Columns["PlaylistName"].Index)
             {
-                DataGridViewComboBoxColumn playlistColumn = (DataGridViewComboBoxColumn)playlistGrid.Columns["PlaylistName"];
-                playlistColumn.DataSource = GetAllPlaylists().Select(p => p.Name).ToList();
+                var playlistColumn = (DataGridViewComboBoxColumn)playlistGrid.Columns["PlaylistName"];
+                var playlists = new List<string> { "All playlists" };
+                playlists.AddRange(GetAllPlaylists().Select(p => p.Name));
+                playlistColumn.DataSource = playlists;
             }
         }
 

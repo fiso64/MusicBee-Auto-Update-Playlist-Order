@@ -14,7 +14,7 @@ namespace MusicBeePlugin
         private PluginInfo about = new PluginInfo();
         private ConfigForm configForm;
         private string configPath;
-        private Dictionary<string, List<(string Order, bool Descending)>> playlistConfig = new Dictionary<string, List<(string Order, bool Descending)>>();
+        private Config config = new Config();
         private Dictionary<string, HashSet<string>> playlistFilePaths = new Dictionary<string, HashSet<string>>();
 
         public PluginInfo Initialise(IntPtr apiInterfacePtr)
@@ -42,29 +42,29 @@ namespace MusicBeePlugin
             var dataPath = mbApi.Setting_GetPersistentStoragePath();
             configPath = Path.Combine(dataPath, "mb_AutoUpdatePlayOrder", "config.json");
             
-            var oldPlaylistConfig = playlistConfig;
+            var oldConfig = config;
             LoadConfig();
 
-            var changedPlaylists = GetChangedPlaylists(oldPlaylistConfig, playlistConfig);
+            var changedPlaylists = config.GetChangedPlaylists(oldConfig);
 
-            configForm = new ConfigForm(mbApi, playlistConfig);
+            configForm = new ConfigForm(mbApi, config);
 
             DialogResult result = configForm.ShowDialog();
 
             if (result == DialogResult.OK)
             {
-                oldPlaylistConfig = playlistConfig;
-                playlistConfig = configForm.GetPlaylistConfig();
+                oldConfig = config;
+                config = configForm.GetConfig();
                 SaveConfig();
 
-                changedPlaylists.UnionWith(GetChangedPlaylists(oldPlaylistConfig, playlistConfig));
+                changedPlaylists.UnionWith(config.GetChangedPlaylists(oldConfig));
                 var allPlaylists = GetAllPlaylists();
 
                 if (changedPlaylists.Contains("All playlists"))
                 {
                     foreach (var playlist in allPlaylists)
                     {
-                        if (!playlistConfig.ContainsKey(playlist.Name))
+                        if (!config.PlaylistConfig.ContainsKey(playlist.Name))
                             UpdatePlaylistPlayOrder(playlist.Path, force: true);
                     }
                 }
@@ -105,10 +105,10 @@ namespace MusicBeePlugin
 
         private void UpdatePlaylistPlayOrder(string url, bool force = false)
         {
-            if (playlistConfig.Count == 0) return;
+            if (config.PlaylistConfig.Count == 0) return;
 
             var playlistName = mbApi.Playlist_GetName(url);
-            if (!playlistConfig.ContainsKey(playlistName) && !playlistConfig.ContainsKey("All playlists")) return;
+            if (!config.PlaylistConfig.ContainsKey(playlistName) && !config.PlaylistConfig.ContainsKey("All playlists")) return;
 
             if (!force && playlistFilePaths.TryGetValue(playlistName, out var previousFilesHashSet))
             {
@@ -136,27 +136,27 @@ namespace MusicBeePlugin
         {
             string playlistName = mbApi.Playlist_GetName(playlistUrl);
 
-            List<(string Order, bool Descending)> sortOrders;
+            OrdersConfig orderConfig;
             
-            if (playlistConfig.ContainsKey(playlistName))
-                sortOrders = playlistConfig[playlistName];
-            else if (playlistConfig.ContainsKey("All playlists"))
-                sortOrders = playlistConfig["All playlists"];
+            if (config.PlaylistConfig.ContainsKey(playlistName))
+                orderConfig = config.PlaylistConfig[playlistName];
+            else if (config.PlaylistConfig.ContainsKey("All playlists"))
+                orderConfig = config.PlaylistConfig["All playlists"];
             else
                 return;
 
-            if (sortOrders.Count == 0) return;
+            if (orderConfig.Orders.Count == 0) return;
 
-            Debug.WriteLine($"Updating playlist {playlistName} with sort order {string.Join(", ", sortOrders.Select(o => $"{o.Order}{(o.Descending ? " (desc)" : "")}"))}");
+            Debug.WriteLine($"Updating playlist {playlistName} with sort order {orderConfig}");
 
             mbApi.Playlist_QueryFilesEx(playlistUrl, out string[] files);
             if (files == null || files.Length == 0) return;
 
             IOrderedEnumerable<string> orderedFiles = null;
 
-            for (int i = 0; i < sortOrders.Count; i++)
+            for (int i = 0; i < orderConfig.Orders.Count; i++)
             {
-                var sortOrder = sortOrders[i];
+                var sortOrder = orderConfig.Orders[i];
                 orderedFiles = ApplySortOrder(orderedFiles, files, sortOrder.Order, sortOrder.Descending);
             }
 
@@ -224,17 +224,17 @@ namespace MusicBeePlugin
                 try
                 {
                     string json = File.ReadAllText(configPath);
-                    playlistConfig = JsonConvert.DeserializeObject<Dictionary<string, List<(string Order, bool Descending)>>>(json) ?? new Dictionary<string, List<(string Order, bool Descending)>>();
+                    config = JsonConvert.DeserializeObject<Config>(json) ?? new Config();
                 }
                 catch (Exception ex)
                 {
                     MessageBox.Show($"Error loading configuration: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    playlistConfig = new Dictionary<string, List<(string Order, bool Descending)>>();
+                    config = new Config();
                 }
             }
             else
             {
-                playlistConfig = new Dictionary<string, List<(string Order, bool Descending)>>();
+                config = new Config();
             }
         }
 
@@ -243,7 +243,7 @@ namespace MusicBeePlugin
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(configPath));
-                string json = JsonConvert.SerializeObject(playlistConfig, Formatting.Indented);
+                string json = JsonConvert.SerializeObject(config, Formatting.Indented);
                 File.WriteAllText(configPath, json);
             }
             catch (Exception ex)

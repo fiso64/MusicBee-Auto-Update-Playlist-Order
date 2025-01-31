@@ -10,16 +10,16 @@ namespace MusicBeePlugin
     public partial class ConfigForm : Form
     {
         private MusicBeeApiInterface mbApi;
-        private Dictionary<string, List<(string Order, bool Descending)>> playlistConfig;
+        private Config config;
         private DataGridView playlistGrid;
         private Button okButton;
         private Button cancelButton;
         private bool gridHasFocus = false; // Track if grid has focus after first click
 
-        public ConfigForm(MusicBeeApiInterface api, Dictionary<string, List<(string Order, bool Descending)>> config)
+        public ConfigForm(MusicBeeApiInterface api, Config config)
         {
             mbApi = api;
-            playlistConfig = new Dictionary<string, List<(string Order, bool Descending)>>(config); // Create a copy to work on
+            this.config = new Config(config);
             InitializeComponent();
             PopulateGrid();
             this.Activated += ConfigForm_Activated; // Ensure focus on form activation
@@ -109,7 +109,7 @@ namespace MusicBeePlugin
             playlistColumn.DisplayStyleForCurrentCellOnly = false; // Ensure dropdown button is always visible
 
             playlistGrid.Rows.Clear();
-            foreach (var playlistName in playlistConfig.Keys)
+            foreach (var playlistName in config.PlaylistConfig.Keys)
             {
                 int rowIndex = playlistGrid.Rows.Add();
                 playlistGrid.Rows[rowIndex].Cells["PlaylistName"].Value = playlistName;
@@ -120,9 +120,9 @@ namespace MusicBeePlugin
 
         private void UpdateOrderDisplayCell(int rowIndex, string playlistName)
         {
-            if (playlistConfig.TryGetValue(playlistName, out var orders) && orders.Count > 0)
+            if (config.PlaylistConfig.TryGetValue(playlistName, out var orderConfig) && orderConfig.Orders.Count > 0)
             {
-                playlistGrid.Rows[rowIndex].Cells["OrderDisplay"].Value = string.Join(", ", orders.Select(o => $"{o.Order}{(o.Descending ? " (desc)" : "")}"));
+                playlistGrid.Rows[rowIndex].Cells["OrderDisplay"].Value = orderConfig.ToString();
             }
             else
             {
@@ -138,12 +138,18 @@ namespace MusicBeePlugin
                 string playlistName = playlistGrid.Rows[e.RowIndex].Cells["PlaylistName"].Value as string;
                 if (playlistName == null) return;
 
-                List<(string Order, bool Descending)> currentOrderConfig = playlistConfig.ContainsKey(playlistName) ? playlistConfig[playlistName] : new List<(string Order, bool Descending)>();
-                using (var orderConfigForm = new OrderConfigForm(currentOrderConfig))
+                var currentOrderConfig = config.PlaylistConfig.TryGetValue(playlistName, out var existing) ? 
+                    existing : new OrdersConfig();
+                using (var orderConfigForm = new OrderConfigForm(currentOrderConfig.Orders.Select(o => (o.Order, o.Descending)).ToList()))
                 {
                     if (orderConfigForm.ShowDialog() == DialogResult.OK)
                     {
-                        playlistConfig[playlistName] = orderConfigForm.GetOrderConfig();
+                        var newConfig = new OrdersConfig { 
+                            Orders = orderConfigForm.GetOrderConfig()
+                                .Select(o => new OrderItem(o.Order, o.Descending))
+                                .ToList() 
+                        };
+                        config.PlaylistConfig[playlistName] = newConfig;
                         UpdateOrderDisplayCell(e.RowIndex, playlistName); // Update the text column after config changes
                     }
                 }
@@ -153,20 +159,20 @@ namespace MusicBeePlugin
                 string playlistName = playlistGrid.Rows[e.RowIndex].Cells["PlaylistName"].Value as string;
                 if (playlistName != null)
                 {
-                    playlistConfig.Remove(playlistName);
+                    config.PlaylistConfig.Remove(playlistName);
                     playlistGrid.Rows.RemoveAt(e.RowIndex);
                 }
             }
         }
 
-        public Dictionary<string, List<(string Order, bool Descending)>> GetPlaylistConfig()
+        public Config GetConfig()
         {
-            var configToSave = new Dictionary<string, List<(string Order, bool Descending)>>();
-            foreach (var pair in playlistConfig)
+            var configToSave = new Config();
+            foreach (var pair in config.PlaylistConfig)
             {
-                if (pair.Value != null && pair.Value.Count > 0) // Only include if configuration is not empty
+                if (pair.Value != null && pair.Value.Orders.Count > 0) // Only include if configuration is not empty
                 {
-                    configToSave.Add(pair.Key, pair.Value);
+                    configToSave.PlaylistConfig[pair.Key] = pair.Value;
                 }
             }
             return configToSave;
@@ -216,9 +222,9 @@ namespace MusicBeePlugin
 
                 if (newPlaylistName != null)
                 {
-                    if (!playlistConfig.ContainsKey(newPlaylistName))
+                    if (!config.PlaylistConfig.ContainsKey(newPlaylistName))
                     {
-                        playlistConfig[newPlaylistName] = new List<(string Order, bool Descending)>();
+                        config.PlaylistConfig[newPlaylistName] = new OrdersConfig();
                     }
                     UpdateOrderDisplayCell(e.RowIndex, newPlaylistName); // Update the text column after playlist name change
                 }
@@ -229,7 +235,7 @@ namespace MusicBeePlugin
         {
             if (e.Row.Cells["PlaylistName"].Value is string playlistName)
             {
-                playlistConfig.Remove(playlistName);
+                config.PlaylistConfig.Remove(playlistName);
             }
         }
 

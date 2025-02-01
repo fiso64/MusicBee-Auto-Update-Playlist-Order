@@ -9,11 +9,13 @@ namespace MusicBeePlugin
 {
     public partial class ConfigForm : Form
     {
+        public event Action<Config> UpdateAllPlaylists;
         private MusicBeeApiInterface mbApi;
         private Config config;
         private DataGridView playlistGrid;
         private Button okButton;
         private Button cancelButton;
+        private Button updateButton;
         private bool gridHasFocus = false; // Track if grid has focus after first click
 
         public ConfigForm(MusicBeeApiInterface api, Config config)
@@ -64,6 +66,16 @@ namespace MusicBeePlugin
             //
             this.cancelButton.Location = new Point(715, 320);
             this.cancelButton.Name = "cancelButton";
+
+            // Update button
+            this.updateButton = new Button();
+            this.updateButton.Location = new Point(553, 320);
+            this.updateButton.Name = "updateButton";
+            this.updateButton.Size = new Size(75, 23);
+            this.updateButton.TabIndex = 3;
+            this.updateButton.Text = "Update All";
+            this.updateButton.UseVisualStyleBackColor = true;
+            this.updateButton.Click += new EventHandler(this.UpdateButton_Click);
             this.cancelButton.Size = new Size(75, 23);
             this.cancelButton.TabIndex = 2;
             this.cancelButton.Text = "Cancel";
@@ -73,6 +85,7 @@ namespace MusicBeePlugin
             // ConfigForm
             //
             this.ClientSize = new Size(800, 350);
+            this.Controls.Add(this.updateButton);
             this.Controls.Add(this.cancelButton);
             this.Controls.Add(this.okButton);
             this.Controls.Add(this.playlistGrid);
@@ -102,7 +115,7 @@ namespace MusicBeePlugin
             playlistGrid.Columns.Add(new DataGridViewButtonColumn { Name = "Delete", HeaderText = "", Text = "Delete", UseColumnTextForButtonValue = true, Width = 50 });
 
             var playlistColumn = (DataGridViewComboBoxColumn)playlistGrid.Columns["PlaylistName"];
-            var playlists = new List<string> { "All playlists" };
+            var playlists = new List<string> { "AllPlaylists" };
             playlists.AddRange(GetAllPlaylists().Select(p => p.Name));
             playlistColumn.DataSource = playlists;
             playlistColumn.DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton;
@@ -140,7 +153,8 @@ namespace MusicBeePlugin
 
                 var currentOrderConfig = config.PlaylistConfig.TryGetValue(playlistName, out var existing) ? 
                     existing : new OrdersConfig();
-                using (var orderConfigForm = new OrderConfigForm(currentOrderConfig.Orders.Select(o => (o.Order, o.Descending)).ToList()))
+                var excluded = playlistName == "AllPlaylists" ? config.AllPlaylistsExclude : null;
+                using (var orderConfigForm = new OrderConfigForm(currentOrderConfig.Orders.Select(o => (o.Order, o.Descending)).ToList(), excluded, playlistName))
                 {
                     if (orderConfigForm.ShowDialog() == DialogResult.OK)
                     {
@@ -150,6 +164,10 @@ namespace MusicBeePlugin
                                 .ToList() 
                         };
                         config.PlaylistConfig[playlistName] = newConfig;
+                        if (playlistName == "AllPlaylists")
+                        {
+                            config.AllPlaylistsExclude = orderConfigForm.GetExcludedPlaylists();
+                        }
                         UpdateOrderDisplayCell(e.RowIndex, playlistName); // Update the text column after config changes
                     }
                 }
@@ -175,6 +193,7 @@ namespace MusicBeePlugin
                     configToSave.PlaylistConfig[pair.Key] = pair.Value;
                 }
             }
+            configToSave.AllPlaylistsExclude = config.AllPlaylistsExclude;
             return configToSave;
         }
 
@@ -182,6 +201,11 @@ namespace MusicBeePlugin
         {
             DialogResult = DialogResult.OK;
             Close();
+        }
+
+        private void UpdateButton_Click(object sender, EventArgs e)
+        {
+            UpdateAllPlaylists?.Invoke(GetConfig());
         }
 
         private void CancelButton_Click(object sender, EventArgs e)
@@ -195,7 +219,7 @@ namespace MusicBeePlugin
             if (e.ColumnIndex == playlistGrid.Columns["PlaylistName"].Index)
             {
                 var playlistColumn = (DataGridViewComboBoxColumn)playlistGrid.Columns["PlaylistName"];
-                var playlists = new List<string> { "All playlists" };
+                var playlists = new List<string> { "AllPlaylists" };
                 playlists.AddRange(GetAllPlaylists().Select(p => p.Name));
                 playlistColumn.DataSource = playlists;
             }

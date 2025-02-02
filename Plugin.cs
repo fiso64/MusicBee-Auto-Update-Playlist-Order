@@ -16,6 +16,8 @@ namespace MusicBeePlugin
         private string configPath;
         private Config config = new Config();
         private Dictionary<string, HashSet<string>> playlistIndex = new Dictionary<string, HashSet<string>>();
+        private Dictionary<string, System.Threading.Timer> debouncedTimers = new Dictionary<string, System.Threading.Timer>();
+        private const int DEBOUNCE_MS = 500;
 
         public PluginInfo Initialise(IntPtr apiInterfacePtr)
         {
@@ -138,26 +140,58 @@ namespace MusicBeePlugin
 
             var playlistName = mbApi.Playlist_GetName(url);
 
-            if (!force && playlistIndex.TryGetValue(playlistName, out var previousFilesHashSet))
+            void ProcessWithErrorHandling()
             {
-                mbApi.Playlist_QueryFilesEx(url, out string[] currentFiles);
-                var currentFilesHashSet = new HashSet<string>(currentFiles);
-
-                if (currentFilesHashSet.IsSubsetOf(previousFilesHashSet))
+                if (!force && playlistIndex.TryGetValue(playlistName, out var previousFilesHashSet))
                 {
-                    playlistIndex[playlistName] = currentFilesHashSet;
-                    return; // No new items have been added, no need to sort
+                    mbApi.Playlist_QueryFilesEx(url, out string[] currentFiles);
+                    var currentFilesHashSet = new HashSet<string>(currentFiles);
+
+                    if (currentFilesHashSet.IsSubsetOf(previousFilesHashSet))
+                    {
+                        playlistIndex[playlistName] = currentFilesHashSet;
+                        return; // No new items have been added, no need to sort
+                    }
+                }
+
+                try
+                {
+                    ProcessPlaylistUpdate(url, config);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error processing playlist {playlistName}: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
 
-            try
+            if (!force && DEBOUNCE_MS > 0)
             {
-                ProcessPlaylistUpdate(url, config);
+                if (debouncedTimers.TryGetValue(playlistName, out var existingTimer))
+                {
+                    existingTimer.Dispose();
+                }
+
+                var timer = new System.Threading.Timer(_ =>
+                {
+                    try 
+                    {
+                        ProcessWithErrorHandling();
+                    }
+                    finally
+                    {
+                        if (debouncedTimers.TryGetValue(playlistName, out var t))
+                        {
+                            t.Dispose();
+                            debouncedTimers.Remove(playlistName);
+                        }
+                    }
+                }, null, DEBOUNCE_MS, System.Threading.Timeout.Infinite);
+
+                debouncedTimers[playlistName] = timer;
+                return;
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error processing playlist {playlistName}: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+
+            ProcessWithErrorHandling();
         }
 
         private void ProcessPlaylistUpdate(string playlistUrl, Config config)

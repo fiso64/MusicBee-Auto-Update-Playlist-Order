@@ -38,6 +38,11 @@ namespace MusicBeePlugin
     {
         public List<OrderItem> Orders { get; set; } = new List<OrderItem>();
 
+        [JsonIgnore]
+        public bool IsManualNormal => Orders.Count == 1 && Orders[0].Order == "ManualOrder" && !Orders[0].Descending;
+        [JsonIgnore]
+        public bool IsManualDescending => Orders.Count == 1 && Orders[0].Order == "ManualOrder" && Orders[0].Descending;
+
         public OrdersConfig()
         {
         }
@@ -70,7 +75,6 @@ namespace MusicBeePlugin
     public class Config
     {
         public Dictionary<string, OrdersConfig> PlaylistConfig { get; set; } = new Dictionary<string, OrdersConfig>();
-        public HashSet<string> AllPlaylistsExclude { get; set; } = new HashSet<string>();
 
         public Config()
         {
@@ -82,7 +86,6 @@ namespace MusicBeePlugin
             {
                 PlaylistConfig[kvp.Key] = new OrdersConfig(kvp.Value);
             }
-            AllPlaylistsExclude = new HashSet<string>(other.AllPlaylistsExclude);
         }
 
         public OrdersConfig GetOrderConfigForPlaylist(string playlistName)
@@ -102,7 +105,7 @@ namespace MusicBeePlugin
             }
         }
 
-        public HashSet<string> GetChangedPlaylists(Config oldConfig)
+        public HashSet<string> GetModifiedPlaylists(Config oldConfig)
         {
             var changedPlaylists = new HashSet<string>();
 
@@ -111,7 +114,11 @@ namespace MusicBeePlugin
                 var hasOldConfig = oldConfig.PlaylistConfig.TryGetValue(playlistName, out var oldOrders);
                 var hasNewConfig = PlaylistConfig.TryGetValue(playlistName, out var newOrders);
 
-                if (!hasOldConfig || !hasNewConfig || !oldOrders.Equals(newOrders))
+                if (hasNewConfig && (!hasOldConfig || !oldOrders.Equals(newOrders)))
+                {
+                    changedPlaylists.Add(playlistName);
+                }
+                else if (hasOldConfig && !hasNewConfig && playlistName != "AllPlaylists" && PlaylistConfig.ContainsKey("AllPlaylists"))
                 {
                     changedPlaylists.Add(playlistName);
                 }
@@ -129,33 +136,7 @@ namespace MusicBeePlugin
                 try
                 {
                     string json = File.ReadAllText(configPath);
-                    
-                    // Check if it's in the new format by looking for PlaylistConfig
-                    if (json.Contains("\"PlaylistConfig\""))
-                    {
-                        config = JsonConvert.DeserializeObject<Config>(json) ?? new Config();
-                    }
-                    else
-                    {
-                        // Try old format
-                        var oldConfig = JsonConvert.DeserializeObject<Dictionary<string, List<(string Order, bool Descending)>>>(json);
-                        if (oldConfig != null)
-                        {
-                            config = new Config();
-                            foreach (var kvp in oldConfig)
-                            {
-                                var ordersConfig = new OrdersConfig();
-                                ordersConfig.Orders = kvp.Value.Select(tuple => new OrderItem(tuple.Order, tuple.Descending)).ToList();
-                                config.PlaylistConfig[kvp.Key] = ordersConfig;
-                            }
-                            
-                            SaveConfig(config, configPath);
-                        }
-                        else
-                        {
-                            config = new Config();
-                        }
-                    }
+                    config = JsonConvert.DeserializeObject<Config>(json) ?? new Config();
                 }
                 catch (Exception ex)
                 {

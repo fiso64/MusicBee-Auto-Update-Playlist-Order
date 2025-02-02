@@ -29,16 +29,18 @@ This ensures that the play order is always what you expect, even when exported o
 3.  In the configuration window:
     *   **Playlist Name**: Select a playlist from the dropdown.
         * Select "AllPlaylists" to define default sorting rules for all playlists.
+        * Individual playlist configurations override the "AllPlaylists" default configuration.
     *   **Order Configuration**: Click the "Configure" button to set up sorting rules for the selected playlist.
         *   In the "Configure Playlist Order" window, you can add multiple sorting criteria. For each criterion:
             *   **Order By**: Choose a tag or file property to sort by (e.g., "Date Added", "Album", "Artist").
             *   **Descending**: Check if you want to sort in descending order.
-        *   For "AllPlaylists", you can click "Manage Exclusions" to select playlists that should ignore the default sorting rules.
+            *   **Manual Order**: Select this to maintain the order in which tracks are added (ascending) or to add new tracks to the beginning of the playlist (descending).
 
 **Notes:**
 * You will need to update your configuration whenever you rename the playlists.
 * Individual playlist configurations override the "AllPlaylists" default configuration.
-* Use "AllPlaylists" to set default sorting rules and exclude specific playlists that need different rules or no sorting.
+* Use "AllPlaylists" to set default sorting rules for playlists that don't have specific configurations.
+* Use "Manual Order (descending)" to automatically add new tracks to the beginning of a playlist.
 
 ## Usage
 
@@ -46,6 +48,7 @@ Once configured, the plugin will automatically update the play order of the spec
 
 *   **Playlist Updated**: When you add or remove tracks from a configured playlist.
 *   **Configuration Changes**: When you modify the playlist configurations in the plugin's settings and click "Ok".
+*   **Manual Update**: Click the "Update All" button in the configuration window to force an update of all configured playlists.
 
 ## Installation
 

@@ -14,21 +14,15 @@ namespace MusicBeePlugin
         private DataGridView orderGrid;
         private Button okButton;
         private Button cancelButton;
-        private Button excludeButton;
         private bool gridHasFocus = false; // Track if grid has focus after first click
-        private HashSet<string> excludedPlaylists;
 
-        public OrderConfigForm(List<(string Order, bool Descending)> config, HashSet<string> excluded = null, string playlistName = null)
+        public OrderConfigForm(List<(string Order, bool Descending)> config, string playlistName = null)
         {
             orderConfig = new List<(string Order, bool Descending)>(config); // Create a copy to work on
-            excludedPlaylists = excluded ?? new HashSet<string>();
             InitializeComponent();
             PopulateGrid();
             this.Activated += OrderConfigForm_Activated; // Ensure focus on form activation
             this.orderGrid.MouseClick += OrderGrid_MouseClick; // Handle first click on grid
-            
-            // Show exclude button only for "AllPlaylists"
-            this.excludeButton.Visible = playlistName == "AllPlaylists";
         }
 
         private void InitializeComponent()
@@ -36,7 +30,6 @@ namespace MusicBeePlugin
             this.orderGrid = new DataGridView();
             this.okButton = new Button();
             this.cancelButton = new Button();
-            this.excludeButton = new Button();
             this.SuspendLayout();
             //
             // orderGrid
@@ -54,14 +47,6 @@ namespace MusicBeePlugin
             //
             // okButton
             //
-            this.excludeButton.Location = new Point(10, 270);
-            this.excludeButton.Name = "excludeButton";
-            this.excludeButton.Size = new Size(120, 23);
-            this.excludeButton.TabIndex = 3;
-            this.excludeButton.Text = "Manage Exclusions";
-            this.excludeButton.UseVisualStyleBackColor = true;
-            this.excludeButton.Click += new EventHandler(this.ExcludeButton_Click);
-            this.excludeButton.Visible = false; // Only show for "AllPlaylists"
 
             this.okButton.Location = new Point(434, 270);
             this.okButton.Name = "okButton";
@@ -86,7 +71,6 @@ namespace MusicBeePlugin
             this.ClientSize = new Size(600, 300);
             this.Controls.Add(this.cancelButton);
             this.Controls.Add(this.okButton);
-            this.Controls.Add(this.excludeButton);
             this.Controls.Add(this.orderGrid);
             this.StartPosition = FormStartPosition.CenterParent; // Center form on parent
             this.KeyPreview = true; // Need to set KeyPreview to true to capture key events for the form
@@ -114,7 +98,10 @@ namespace MusicBeePlugin
             orderGrid.Columns.Add(new DataGridViewButtonColumn { Name = "Delete", HeaderText = "", Text = "Delete", UseColumnTextForButtonValue = true, Width = 50 });
 
             DataGridViewComboBoxColumn orderTypeColumn = (DataGridViewComboBoxColumn)orderGrid.Columns["OrderType"];
-            var orderTypes = Enum.GetNames(typeof(FilePropertyType)).Concat(Enum.GetNames(typeof(MetaDataType))).ToList();
+            var orderTypes = new List<string> { "ManualOrder" }
+                .Concat(Enum.GetNames(typeof(FilePropertyType)))
+                .Concat(Enum.GetNames(typeof(MetaDataType)))
+                .ToList();
             orderTypeColumn.DataSource = orderTypes;
             orderTypeColumn.DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton;
             orderTypeColumn.DisplayStyleForCurrentCellOnly = false; // Ensure dropdown button is always visible
@@ -157,8 +144,28 @@ namespace MusicBeePlugin
         }
 
 
+        private bool ValidateOrderConfig()
+        {
+            var orders = GetOrderConfig();
+            
+            bool hasManualOrder = orders.Any(o => o.Order == "ManualOrder");
+            bool hasOtherOrders = orders.Any(o => o.Order != "ManualOrder");
+            
+            if (hasManualOrder && hasOtherOrders)
+            {
+                MessageBox.Show("ManualOrder cannot be combined with other sort orders", 
+                    "Invalid Configuration", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+            
+            return true;
+        }
+
         private void OkButton_Click(object sender, EventArgs e)
         {
+            if (!ValidateOrderConfig())
+                return;
+            
             DialogResult = DialogResult.OK;
             Close();
         }
@@ -187,20 +194,5 @@ namespace MusicBeePlugin
             }
         }
 
-        private void ExcludeButton_Click(object sender, EventArgs e)
-        {
-            using (var excludeForm = new ExcludePlaylistsForm(excludedPlaylists))
-            {
-                if (excludeForm.ShowDialog() == DialogResult.OK)
-                {
-                    excludedPlaylists = excludeForm.GetExcludedPlaylists();
-                }
-            }
-        }
-
-        public HashSet<string> GetExcludedPlaylists()
-        {
-            return excludedPlaylists;
-        }
     }
 }

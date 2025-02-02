@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
@@ -47,10 +48,10 @@ namespace MusicBeePlugin
             this.playlistGrid.TabIndex = 0;
             this.playlistGrid.CellContentClick += PlaylistGrid_CellContentClick;
             this.playlistGrid.CellBeginEdit += PlaylistGrid_CellBeginEdit;
-            this.playlistGrid.CellEndEdit += PlaylistGrid_CellEndEdit;
             this.playlistGrid.UserDeletingRow += PlaylistGrid_UserDeletingRow;
             this.playlistGrid.DataError += PlaylistGrid_DataError;
             this.playlistGrid.EditMode = DataGridViewEditMode.EditOnEnter; // Try EditOnEnter mode
+            this.playlistGrid.CurrentCellDirtyStateChanged += PlaylistGrid_CurrentCellDirtyStateChanged;
             //
             // okButton
             //
@@ -109,12 +110,18 @@ namespace MusicBeePlugin
         private void PopulateGrid()
         {
             playlistGrid.Columns.Clear();
-            playlistGrid.Columns.Add(new DataGridViewComboBoxColumn { Name = "PlaylistName", HeaderText = "Playlist Name", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
+            var playlistColumn = new DataGridViewComboBoxColumn 
+            { 
+                Name = "PlaylistName", 
+                HeaderText = "Playlist Name", 
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill 
+            };
+            playlistGrid.Columns.Add(playlistColumn);
+            playlistGrid.CellValueChanged += PlaylistGrid_CellValueChanged;
             playlistGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "OrderDisplay", HeaderText = "Order Configuration", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, ReadOnly = true }); // New text column
             playlistGrid.Columns.Add(new DataGridViewButtonColumn { Name = "Order", HeaderText = "Order", Text = "Configure", UseColumnTextForButtonValue = true, Width = 100 }); // Configure button, always "Configure" text
             playlistGrid.Columns.Add(new DataGridViewButtonColumn { Name = "Delete", HeaderText = "", Text = "Delete", UseColumnTextForButtonValue = true, Width = 50 });
 
-            var playlistColumn = (DataGridViewComboBoxColumn)playlistGrid.Columns["PlaylistName"];
             var playlists = new List<string> { "AllPlaylists" };
             playlists.AddRange(GetAllPlaylists().Select(p => p.Name));
             playlistColumn.DataSource = playlists;
@@ -153,8 +160,7 @@ namespace MusicBeePlugin
 
                 var currentOrderConfig = config.PlaylistConfig.TryGetValue(playlistName, out var existing) ? 
                     existing : new OrdersConfig();
-                var excluded = playlistName == "AllPlaylists" ? config.AllPlaylistsExclude : null;
-                using (var orderConfigForm = new OrderConfigForm(currentOrderConfig.Orders.Select(o => (o.Order, o.Descending)).ToList(), excluded, playlistName))
+                using (var orderConfigForm = new OrderConfigForm(currentOrderConfig.Orders.Select(o => (o.Order, o.Descending)).ToList(), playlistName))
                 {
                     if (orderConfigForm.ShowDialog() == DialogResult.OK)
                     {
@@ -164,10 +170,6 @@ namespace MusicBeePlugin
                                 .ToList() 
                         };
                         config.PlaylistConfig[playlistName] = newConfig;
-                        if (playlistName == "AllPlaylists")
-                        {
-                            config.AllPlaylistsExclude = orderConfigForm.GetExcludedPlaylists();
-                        }
                         UpdateOrderDisplayCell(e.RowIndex, playlistName); // Update the text column after config changes
                     }
                 }
@@ -185,16 +187,7 @@ namespace MusicBeePlugin
 
         public Config GetConfig()
         {
-            var configToSave = new Config();
-            foreach (var pair in config.PlaylistConfig)
-            {
-                if (pair.Value != null && pair.Value.Orders.Count > 0) // Only include if configuration is not empty
-                {
-                    configToSave.PlaylistConfig[pair.Key] = pair.Value;
-                }
-            }
-            configToSave.AllPlaylistsExclude = config.AllPlaylistsExclude;
-            return configToSave;
+           return config;
         }
 
         private void OkButton_Click(object sender, EventArgs e)
@@ -225,36 +218,6 @@ namespace MusicBeePlugin
             }
         }
 
-        private void PlaylistGrid_CellEndEdit(object sender, DataGridViewCellEventArgs e)
-        {
-            if (e.ColumnIndex == playlistGrid.Columns["PlaylistName"].Index && e.RowIndex >= 0 && e.RowIndex < playlistGrid.Rows.Count - 1)
-            {
-                string newPlaylistName = playlistGrid.Rows[e.RowIndex].Cells["PlaylistName"].Value as string;
-                if (string.IsNullOrEmpty(newPlaylistName)) return;
-
-                // Check for duplicates (excluding the current row being edited)
-                foreach (DataGridViewRow row in playlistGrid.Rows)
-                {
-                    if (row.Index != e.RowIndex && !row.IsNewRow && row.Cells["PlaylistName"].Value as string == newPlaylistName)
-                    {
-                        MessageBox.Show($"Playlist '{newPlaylistName}' is already configured.", "Duplicate Playlist", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        playlistGrid.Rows[e.RowIndex].Cells["PlaylistName"].Value = playlistGrid.Rows[e.RowIndex - 1].Cells["PlaylistName"].Value; // Revert to previous, or clear if new row
-                        return; // Exit without adding/updating
-                    }
-                }
-
-
-                if (newPlaylistName != null)
-                {
-                    if (!config.PlaylistConfig.ContainsKey(newPlaylistName))
-                    {
-                        config.PlaylistConfig[newPlaylistName] = new OrdersConfig();
-                    }
-                    UpdateOrderDisplayCell(e.RowIndex, newPlaylistName); // Update the text column after playlist name change
-                }
-            }
-        }
-
         private void PlaylistGrid_UserDeletingRow(object sender, DataGridViewRowCancelEventArgs e)
         {
             if (e.Row.Cells["PlaylistName"].Value is string playlistName)
@@ -262,7 +225,6 @@ namespace MusicBeePlugin
                 config.PlaylistConfig.Remove(playlistName);
             }
         }
-
 
         private void PlaylistGrid_DataError(object sender, DataGridViewDataErrorEventArgs e)
         {
@@ -289,6 +251,46 @@ namespace MusicBeePlugin
             {
                 this.playlistGrid.Focus();
                 gridHasFocus = true;
+            }
+        }
+
+        private void PlaylistGrid_CurrentCellDirtyStateChanged(object sender, EventArgs e)
+        {
+            if (playlistGrid.IsCurrentCellDirty && 
+                playlistGrid.CurrentCell.ColumnIndex == playlistGrid.Columns["PlaylistName"].Index)
+            {
+                playlistGrid.CommitEdit(DataGridViewDataErrorContexts.Commit);
+            }
+        }
+
+        private void PlaylistGrid_CellValueChanged(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.ColumnIndex == playlistGrid.Columns["PlaylistName"].Index && e.RowIndex >= 0 && e.RowIndex < playlistGrid.Rows.Count - 1)
+            {
+                string newPlaylistName = playlistGrid.Rows[e.RowIndex].Cells["PlaylistName"].Value as string;
+                if (string.IsNullOrEmpty(newPlaylistName)) return;
+
+                foreach (DataGridViewRow row in playlistGrid.Rows)
+                {
+                    if (row.Index != e.RowIndex && !row.IsNewRow && row.Cells["PlaylistName"].Value as string == newPlaylistName)
+                    {
+                        MessageBox.Show($"Playlist '{newPlaylistName}' is already configured.", "Duplicate Playlist", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        playlistGrid.Rows[e.RowIndex].Cells["PlaylistName"].Value = playlistGrid.Rows[e.RowIndex - 1].Cells["PlaylistName"].Value;
+                        return;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(newPlaylistName))
+                {
+                    if (!config.PlaylistConfig.ContainsKey(newPlaylistName))
+                    {
+                        config.PlaylistConfig[newPlaylistName] = new OrdersConfig
+                        {
+                            Orders = new List<OrderItem> { new OrderItem("ManualOrder", false) }
+                        };
+                    }
+                    UpdateOrderDisplayCell(e.RowIndex, newPlaylistName);
+                }
             }
         }
     }

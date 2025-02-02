@@ -28,7 +28,7 @@ namespace MusicBeePlugin
             about.TargetApplication = "";
             about.Type = PluginType.General;
             about.VersionMajor = 1;
-            about.VersionMinor = 1;
+            about.VersionMinor = 2;
             about.Revision = 1;
             about.MinInterfaceVersion = MinInterfaceVersion;
             about.MinApiRevision = MinApiRevision;
@@ -55,6 +55,19 @@ namespace MusicBeePlugin
             var dataPath = mbApi.Setting_GetPersistentStoragePath();
             configPath = Path.Combine(dataPath, "mb_AutoUpdatePlayOrder", "config.json");
             config = Config.LoadFromPath(configPath);
+
+            LoadManualDescendingPlaylists();   
+        }
+
+        private void LoadManualDescendingPlaylists()
+        {
+            var allPlaylists = GetAllPlaylists();
+            foreach (var playlist in config.PlaylistConfig.Where(x => x.Value.IsManualDescending))
+            {
+                var playlistPath = allPlaylists.FirstOrDefault(p => p.Name == playlist.Key).Path;
+                mbApi.Playlist_QueryFilesEx(playlistPath, out string[] files);
+                playlistIndex[playlist.Key] = new HashSet<string>(files);
+            }
         }
 
         public bool Configure(IntPtr panelHandle)
@@ -74,7 +87,7 @@ namespace MusicBeePlugin
                 config = configForm.GetConfig();
                 Config.SaveConfig(config, configPath);
 
-                var changedPlaylists = config.GetChangedPlaylists(oldConfig);
+                var changedPlaylists = config.GetModifiedPlaylists(oldConfig);
                 UpdatePlaylistsChanged(oldConfig, config, changedPlaylists);
             }
 
@@ -92,23 +105,21 @@ namespace MusicBeePlugin
         private void UpdatePlaylistsChanged(Config oldConfig, Config newConfig, HashSet<string> changedPlaylists)
         {
             var allPlaylists = GetAllPlaylists();
-            var removedExcludes = oldConfig.AllPlaylistsExclude.Except(newConfig.AllPlaylistsExclude);
+            var modifiedConfigPlaylists = changedPlaylists.Where(x => newConfig.PlaylistConfig.ContainsKey(x));
+
+            foreach (var changed in modifiedConfigPlaylists.Where(x => newConfig.PlaylistConfig[x].IsManualDescending))
+            {
+                var playlistPath = allPlaylists.FirstOrDefault(p => p.Name == changed).Path;
+                mbApi.Playlist_QueryFilesEx(playlistPath, out string[] files);
+                playlistIndex[changed] = new HashSet<string>(files);
+            }
 
             if (changedPlaylists.Contains("AllPlaylists"))
             {
                 foreach (var playlist in allPlaylists)
                 {
-                    if (!newConfig.PlaylistConfig.ContainsKey(playlist.Name) && !newConfig.AllPlaylistsExclude.Contains(playlist.Name))
+                    if (!newConfig.PlaylistConfig.ContainsKey(playlist.Name))
                         UpdatePlaylistPlayOrder(playlist.Path, newConfig, force: true);
-                }
-            }
-            else if (removedExcludes.Any() && newConfig.PlaylistConfig.ContainsKey("AllPlaylists"))
-            {
-                foreach (var playlistName in removedExcludes.Where(p => !newConfig.PlaylistConfig.ContainsKey(p)))
-                {
-                    var playlistPath = allPlaylists.FirstOrDefault(p => p.Name == playlistName).Path;
-                    if (playlistPath != null)
-                        UpdatePlaylistPlayOrder(playlistPath, newConfig, force: true);
                 }
             }
 
@@ -122,7 +133,8 @@ namespace MusicBeePlugin
 
         private void UpdatePlaylistPlayOrder(string url, Config config, bool force = false)
         {
-            if (config.PlaylistConfig.Count == 0) return;
+            if (config.PlaylistConfig.Count == 0) 
+                return;
 
             var playlistName = mbApi.Playlist_GetName(url);
 
@@ -138,12 +150,6 @@ namespace MusicBeePlugin
                 }
             }
 
-            if (!config.PlaylistConfig.ContainsKey(playlistName))
-            {
-                if (!config.PlaylistConfig.ContainsKey("AllPlaylists") || config.AllPlaylistsExclude.Contains(playlistName))
-                    return;
-            } 
-
             try
             {
                 ProcessPlaylistUpdate(url, config);
@@ -158,16 +164,37 @@ namespace MusicBeePlugin
         {
             string playlistName = mbApi.Playlist_GetName(playlistUrl);
 
-            OrdersConfig orderConfig;
+            if (!config.PlaylistConfig.TryGetValue(playlistName, out OrdersConfig orderConfig) &&
+                config.PlaylistConfig.TryGetValue("AllPlaylists", out OrdersConfig allPlaylistsConfig))
+            {
+                orderConfig = allPlaylistsConfig;
+            }
             
-            if (config.PlaylistConfig.ContainsKey(playlistName))
-                orderConfig = config.PlaylistConfig[playlistName];
-            else if (config.PlaylistConfig.ContainsKey("AllPlaylists"))
-                orderConfig = config.PlaylistConfig["AllPlaylists"];
-            else
+            if (orderConfig == null)
                 return;
 
-            if (orderConfig.Orders.Count == 0) return;
+            if (orderConfig.Orders.Count == 0 || orderConfig.IsManualNormal)
+                return;
+
+            if (orderConfig.IsManualDescending)
+            {
+                mbApi.Playlist_QueryFilesEx(playlistUrl, out string[] currentFiles);
+
+                var previousFiles = playlistIndex[playlistName];
+                var newFiles = currentFiles.Where(f => !previousFiles.Contains(f)).ToArray();
+                
+                playlistIndex[playlistName] = new HashSet<string>(currentFiles);
+                
+                if (newFiles.Any())
+                {
+                    Debug.WriteLine($"Prepending new files to playlist {playlistName}");
+                    var existingFiles = currentFiles.Except(newFiles).ToList();
+                    var result = newFiles.Concat(existingFiles).ToList();
+                    mbApi.Playlist_SetFiles(playlistUrl, result.ToArray());
+                }
+                
+                return;
+            }
 
             Debug.WriteLine($"Updating playlist {playlistName} with sort order {orderConfig}");
 

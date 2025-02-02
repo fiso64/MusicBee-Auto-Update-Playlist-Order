@@ -148,10 +148,17 @@ namespace MusicBeePlugin
         {
             var orders = GetOrderConfig();
             
-            bool hasManualOrder = orders.Any(o => o.Order == "ManualOrder");
+            int manualOrderCount = orders.Count(o => o.Order == "ManualOrder");
             bool hasOtherOrders = orders.Any(o => o.Order != "ManualOrder");
             
-            if (hasManualOrder && hasOtherOrders)
+            if (manualOrderCount > 1)
+            {
+                MessageBox.Show("Multiple ManualOrder entries are not allowed",
+                    "Invalid Configuration", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+            
+            if (manualOrderCount == 1 && hasOtherOrders)
             {
                 MessageBox.Show("ManualOrder cannot be combined with other sort orders", 
                     "Invalid Configuration", MessageBoxButtons.OK, MessageBoxIcon.Warning);

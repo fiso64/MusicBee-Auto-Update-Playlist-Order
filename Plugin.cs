@@ -267,6 +267,9 @@ namespace MusicBeePlugin
                 return s;
             }
 
+            if (order == "ManualOrder")
+                return currentOrder;
+
             FilePropertyType filePropertyType = 0;
             MetaDataType metaDataType = 0;
             

@@ -39,9 +39,9 @@ namespace MusicBeePlugin
         public List<OrderItem> Orders { get; set; } = new List<OrderItem>();
 
         [JsonIgnore]
-        public bool IsManualNormal => Orders.Count == 1 && Orders[0].Order == "ManualOrder" && !Orders[0].Descending;
+        public bool IsManualNormal => Orders.Count >= 1 && Orders[0].Order == "ManualOrder" && !Orders[0].Descending;
         [JsonIgnore]
-        public bool IsManualDescending => Orders.Count == 1 && Orders[0].Order == "ManualOrder" && Orders[0].Descending;
+        public bool IsManualDescending => Orders.Count >= 1 && Orders[0].Order == "ManualOrder" && Orders[0].Descending;
 
         public OrdersConfig()
         {

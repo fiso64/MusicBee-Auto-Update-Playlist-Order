@@ -34,13 +34,13 @@ This ensures that the play order is always what you expect, even when exported o
         *   In the "Configure Playlist Order" window, you can add multiple sorting criteria. For each criterion:
             *   **Order By**: Choose a tag or file property to sort by (e.g., "Date Added", "Album", "Artist").
             *   **Descending**: Check if you want to sort in descending order.
-            *   **Manual Order**: Select this to maintain the order in which tracks are added (ascending) or to add new tracks to the beginning of the playlist (descending).
+            *   **Manual Order**: 
+                * Use ascending to prevent a playlist from being affected by "AllPlaylists" sorting rules
+                * Use descending to add new tracks at the start of the playlist
 
 **Notes:**
 * You will need to update your configuration whenever you rename the playlists.
-* Individual playlist configurations override the "AllPlaylists" default configuration.
-* Use "AllPlaylists" to set default sorting rules for playlists that don't have specific configurations.
-* Use "Manual Order (descending)" to automatically add new tracks to the beginning of a playlist.
+* Manual Order (ascending) is only needed when you want to exclude a playlist from "AllPlaylists" sorting
 
 ## Usage
 

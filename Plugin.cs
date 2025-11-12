@@ -92,9 +92,12 @@ namespace MusicBeePlugin
             var allPlaylists = GetAllPlaylists();
             foreach (var playlist in config.PlaylistConfig.Where(x => x.Value.IsManualDescending))
             {
-                var playlistPath = allPlaylists.FirstOrDefault(p => p.Name == playlist.Key).Path;
-                mbApi.Playlist_QueryFilesEx(playlistPath, out string[] files);
-                playlistIndex[playlist.Key] = new HashSet<string>(files);
+                var playlistInfo = allPlaylists.FirstOrDefault(p => p.Name == playlist.Key);
+                if (playlistInfo.Path != null)
+                {
+                    mbApi.Playlist_QueryFilesEx(playlistInfo.Path, out string[] files);
+                    playlistIndex[playlist.Key] = new HashSet<string>(files);
+                }
             }
         }
 
@@ -135,12 +138,15 @@ namespace MusicBeePlugin
             var allPlaylists = GetAllPlaylists();
             var modifiedConfigPlaylists = changedPlaylists.Where(x => newConfig.PlaylistConfig.ContainsKey(x));
 
-            foreach (var changed in modifiedConfigPlaylists.Where(x => newConfig.PlaylistConfig[x].IsManualDescending))
-            {
-                var playlistPath = allPlaylists.FirstOrDefault(p => p.Name == changed).Path;
-                mbApi.Playlist_QueryFilesEx(playlistPath, out string[] files);
-                playlistIndex[changed] = new HashSet<string>(files);
-            }
+    foreach (var changed in modifiedConfigPlaylists.Where(x => newConfig.PlaylistConfig[x].IsManualDescending))
+    {
+        var playlistInfo = allPlaylists.FirstOrDefault(p => p.Name == changed);
+        if (playlistInfo.Path != null)
+        {
+            mbApi.Playlist_QueryFilesEx(playlistInfo.Path, out string[] files);
+            playlistIndex[changed] = new HashSet<string>(files);
+        }
+    }
 
             if (changedPlaylists.Contains("AllPlaylists"))
             {

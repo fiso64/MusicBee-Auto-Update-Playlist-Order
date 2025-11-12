@@ -18,6 +18,7 @@ namespace MusicBeePlugin
         private Button cancelButton;
         private Button updateButton;
         private bool gridHasFocus = false; // Track if grid has focus after first click
+        private object oldValue;
 
         public ConfigForm(MusicBeeApiInterface api, Config config)
         {
@@ -211,6 +212,7 @@ namespace MusicBeePlugin
         {
             if (e.ColumnIndex == playlistGrid.Columns["PlaylistName"].Index)
             {
+                oldValue = playlistGrid.Rows[e.RowIndex].Cells["PlaylistName"].Value;
                 var playlistColumn = (DataGridViewComboBoxColumn)playlistGrid.Columns["PlaylistName"];
                 var playlists = new List<string> { "AllPlaylists" };
                 playlists.AddRange(GetAllPlaylists().Select(p => p.Name));
@@ -275,7 +277,7 @@ namespace MusicBeePlugin
                     if (row.Index != e.RowIndex && !row.IsNewRow && row.Cells["PlaylistName"].Value as string == newPlaylistName)
                     {
                         MessageBox.Show($"Playlist '{newPlaylistName}' is already configured.", "Duplicate Playlist", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        playlistGrid.Rows[e.RowIndex].Cells["PlaylistName"].Value = playlistGrid.Rows[e.RowIndex - 1].Cells["PlaylistName"].Value;
+                        playlistGrid.Rows[e.RowIndex].Cells["PlaylistName"].Value = oldValue;
                         return;
                     }
                 }

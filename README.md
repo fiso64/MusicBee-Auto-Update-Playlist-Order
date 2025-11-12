@@ -25,30 +25,14 @@ This plugin can automate this "Update Play Order" step whenever a playlist is mo
 
 ## How it works
 
+Go to **Preferences > Plugins**. Find "Auto Update Playlist Order" and click **Configure**.
+
 This plugin allows you to define sorting rules for specific playlists. When a configured playlist is updated (tracks added or removed), the plugin will update the playlist's "natural play order".
 
 This ensures that the play order is always what you expect, even when exported or synced.
 
-## Configuration
-
-Go to **Preferences > Plugins**. Find "Auto Update Playlist Order" and click **Configure**.
-
-In the configuration window:
-
-*   **Playlist Name**: Select a playlist from the dropdown.
-    * Select "AllPlaylists" to define default sorting rules for all playlists.
-    * Individual playlist configurations override the "AllPlaylists" default configuration.
-*   **Order Configuration**: Click the "Configure" button to set up sorting rules for the selected playlist.
-    *   In the "Configure Playlist Order" window, you can add multiple sorting criteria. For each criterion:
-        *   **Order By**: Choose a tag or file property to sort by (e.g., "Date Added", "Album", "Artist").
-        *   **Descending**: Check if you want to sort in descending order.
-        *   **Manual Order**: 
-            * Use ascending to prevent a playlist from being affected by "AllPlaylists" sorting rules
-            * Use descending to add new tracks at the start of the playlist
-
-**Notes:**
+**Note:**
 * You will need to update your configuration whenever you rename the playlists.
-* "Manual Order (ascending)" corresponds to "Manual Order" sorting in MusicBee. Sorting a playlist by this is only useful when you want to exclude it from "AllPlaylists" sorting criteria.
 
 ## Installation
 

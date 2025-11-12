@@ -1,111 +1,99 @@
 using System;
-using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace MusicBeePlugin
 {
     public class PlaylistConfigControl : UserControl
     {
-        private readonly ComboBox _playlistComboBox;
-        private readonly Label _orderDisplayLabel;
-        private readonly Button _configureButton;
-        private readonly Button _removeButton;
+        private Label _playlistNameLabel;
+        private Label _orderDisplayLabel;
+        private Button _configureButton;
+        private Button _clearButton;
 
-        public event EventHandler RemoveClicked;
-        public event EventHandler PlaylistChanged;
+        public string PlaylistName { get; }
+
         public event EventHandler ConfigureClicked;
+        public event EventHandler ClearClicked;
 
-        public string SelectedPlaylist
+        public PlaylistConfigControl(string playlistName, string displayName, OrdersConfig ordersConfig)
         {
-            get => _playlistComboBox.SelectedItem as string;
-            set => _playlistComboBox.SelectedItem = value;
+            this.PlaylistName = playlistName;
+            InitializeComponent();
+            _playlistNameLabel.Text = displayName;
+            UpdateDisplay(ordersConfig);
         }
 
-        public string OldPlaylistName { get; set; }
-
-        public string OrderDisplay
+        private void InitializeComponent()
         {
-            set => _orderDisplayLabel.Text = value;
-        }
+            _playlistNameLabel = new Label();
+            _orderDisplayLabel = new Label();
+            _configureButton = new Button();
+            _clearButton = new Button();
+            this.SuspendLayout();
 
-        public PlaylistConfigControl(string selectedPlaylist, string orderDisplay)
-        {
-            // UserControl properties
-            this.Margin = new Padding(3);
-            this.Padding = new Padding(5);
+            // PlaylistConfigControl
             this.Size = new Size(750, 45);
+            this.Margin = new Padding(3, 3, 3, 0);
+            this.BackColor = SystemColors.Control;
             this.BorderStyle = BorderStyle.FixedSingle;
 
-            // Playlist ComboBox
-            _playlistComboBox = new ComboBox
-            {
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Location = new Point(10, 10),
-                Size = new Size(200, 21),
-                TabIndex = 0
-            };
-            _playlistComboBox.SelectionChangeCommitted += (s, e) => PlaylistChanged?.Invoke(this, EventArgs.Empty);
-            this.Controls.Add(_playlistComboBox);
+            // _playlistNameLabel
+            _playlistNameLabel.Font = new Font("Segoe UI", 10F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            _playlistNameLabel.Location = new Point(10, 12);
+            _playlistNameLabel.Size = new Size(250, 20);
+            _playlistNameLabel.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+            _playlistNameLabel.TextAlign = ContentAlignment.MiddleLeft;
+            _playlistNameLabel.AutoEllipsis = true;
+            _playlistNameLabel.UseMnemonic = false;
 
-            OldPlaylistName = selectedPlaylist;
-
-            // Order Display Label
-            _orderDisplayLabel = new Label
-            {
-                Text = orderDisplay,
-                Location = new Point(220, 10),
-                Size = new Size(390, 23),
-                TextAlign = ContentAlignment.MiddleLeft,
-                AutoEllipsis = true,
-                BorderStyle = BorderStyle.Fixed3D,
-                BackColor = SystemColors.ControlLightLight,
-                TabIndex = 1,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-            };
-            this.Controls.Add(_orderDisplayLabel);
-
-            // Configure Button
-            _configureButton = new Button
-            {
-                Text = "Configure",
-                Location = new Point(620, 9),
-                Size = new Size(75, 23),
-                TabIndex = 2,
-                Anchor = AnchorStyles.Top | AnchorStyles.Right
-            };
+            // _configureButton
+            _configureButton.Text = "Configure";
+            _configureButton.Location = new Point(this.Width - 180, 10);
+            _configureButton.Size = new Size(80, 25);
+            _configureButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             _configureButton.Click += (s, e) => ConfigureClicked?.Invoke(this, EventArgs.Empty);
-            this.Controls.Add(_configureButton);
+            _configureButton.FlatStyle = FlatStyle.System;
 
-            // Remove Button
-            _removeButton = new Button
-            {
-                Text = "X",
-                Location = new Point(705, 9),
-                Size = new Size(23, 23),
-                ForeColor = Color.Red,
-                Font = new Font(this.Font, FontStyle.Bold),
-                FlatStyle = FlatStyle.Flat,
-                TabIndex = 3,
-                Anchor = AnchorStyles.Top | AnchorStyles.Right
-            };
-            _removeButton.FlatAppearance.BorderSize = 0;
-            _removeButton.Click += (s, e) => RemoveClicked?.Invoke(this, EventArgs.Empty);
-            this.Controls.Add(_removeButton);
+            // _clearButton
+            _clearButton.Text = "Clear";
+            _clearButton.Location = new Point(this.Width - 90, 10);
+            _clearButton.Size = new Size(80, 25);
+            _clearButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            _clearButton.Click += (s, e) => ClearClicked?.Invoke(this, EventArgs.Empty);
+            _clearButton.FlatStyle = FlatStyle.System;
+
+            // _orderDisplayLabel
+            _orderDisplayLabel.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            _orderDisplayLabel.ForeColor = SystemColors.ControlDarkDark;
+            _orderDisplayLabel.Location = new Point(265, 13);
+            _orderDisplayLabel.Size = new Size(this.Width - 265 - 185, 20); // Dynamic width
+            _orderDisplayLabel.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            _orderDisplayLabel.TextAlign = ContentAlignment.MiddleLeft;
+            _orderDisplayLabel.AutoEllipsis = true;
+
+            this.Controls.Add(_playlistNameLabel);
+            this.Controls.Add(_orderDisplayLabel);
+            this.Controls.Add(_configureButton);
+            this.Controls.Add(_clearButton);
+
+            this.ResumeLayout(false);
         }
 
-        public void SetPlaylistSource(List<string> playlistDataSource)
+        public void UpdateDisplay(OrdersConfig ordersConfig)
         {
-            string selectedPlaylist = this.OldPlaylistName;
-            var currentPlaylists = new List<string>(playlistDataSource);
-            
-            if (!currentPlaylists.Contains(selectedPlaylist))
+            bool isConfigured = ordersConfig != null && ordersConfig.Orders.Any();
+            if (isConfigured)
             {
-                currentPlaylists.Add(selectedPlaylist);
+                _orderDisplayLabel.Text = ordersConfig.ToString();
+                _clearButton.Visible = true;
             }
-
-            _playlistComboBox.DataSource = currentPlaylists;
-            _playlistComboBox.SelectedItem = selectedPlaylist;
+            else
+            {
+                _orderDisplayLabel.Text = "Using default sort order";
+                _clearButton.Visible = false;
+            }
         }
     }
 }

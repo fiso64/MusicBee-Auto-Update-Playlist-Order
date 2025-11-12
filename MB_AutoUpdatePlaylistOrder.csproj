@@ -93,6 +93,9 @@
     <Compile Include="OrderConfigForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="PlaylistConfigControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Include="Plugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

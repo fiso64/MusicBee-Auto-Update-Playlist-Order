@@ -13,89 +13,89 @@ namespace MusicBeePlugin
         public event Action<Config> UpdateAllPlaylists;
         private MusicBeeApiInterface mbApi;
         private Config config;
-        private DataGridView playlistGrid;
+        private FlowLayoutPanel playlistPanel;
         private Button okButton;
         private Button cancelButton;
         private Button updateButton;
-        private bool gridHasFocus = false; // Track if grid has focus after first click
-        private object oldValue;
 
         public ConfigForm(MusicBeeApiInterface api, Config config)
         {
             mbApi = api;
             this.config = new Config(config);
             InitializeComponent();
-            PopulateGrid();
-            this.Activated += ConfigForm_Activated; // Ensure focus on form activation
-            this.playlistGrid.MouseClick += PlaylistGrid_MouseClick; // Handle first click on grid
+            PopulatePlaylists();
         }
 
         private void InitializeComponent()
         {
-            this.playlistGrid = new DataGridView();
+            this.playlistPanel = new FlowLayoutPanel();
             this.okButton = new Button();
             this.cancelButton = new Button();
+            this.updateButton = new Button();
             this.SuspendLayout();
-            //
-            // playlistGrid
-            //
-            this.playlistGrid.AllowUserToAddRows = true;
-            this.playlistGrid.AllowUserToDeleteRows = true;
-            this.playlistGrid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            this.playlistGrid.Dock = DockStyle.Top;
-            this.playlistGrid.Location = new Point(10, 10);
-            this.playlistGrid.Name = "playlistGrid";
-            this.playlistGrid.Size = new Size(780, 300);
-            this.playlistGrid.TabIndex = 0;
-            this.playlistGrid.CellContentClick += PlaylistGrid_CellContentClick;
-            this.playlistGrid.CellBeginEdit += PlaylistGrid_CellBeginEdit;
-            this.playlistGrid.UserDeletingRow += PlaylistGrid_UserDeletingRow;
-            this.playlistGrid.DataError += PlaylistGrid_DataError;
-            this.playlistGrid.EditMode = DataGridViewEditMode.EditOnEnter; // Try EditOnEnter mode
-            this.playlistGrid.CurrentCellDirtyStateChanged += PlaylistGrid_CurrentCellDirtyStateChanged;
-            //
+            // 
+            // playlistPanel
+            // 
+            this.playlistPanel.Anchor = ((AnchorStyles)((((AnchorStyles.Top | AnchorStyles.Bottom)
+            | AnchorStyles.Left)
+            | AnchorStyles.Right)));
+            this.playlistPanel.AutoScroll = true;
+            this.playlistPanel.Location = new Point(12, 12);
+            this.playlistPanel.Name = "playlistPanel";
+            this.playlistPanel.Size = new Size(776, 387);
+            this.playlistPanel.TabIndex = 0;
+            this.playlistPanel.FlowDirection = FlowDirection.TopDown;
+            this.playlistPanel.WrapContents = false;
+            // 
             // okButton
-            //
-            this.okButton.Location = new Point(634, 320);
+            // 
+            this.okButton.Anchor = ((AnchorStyles)((AnchorStyles.Bottom | AnchorStyles.Right)));
+            this.okButton.Location = new Point(632, 415);
             this.okButton.Name = "okButton";
             this.okButton.Size = new Size(75, 23);
             this.okButton.TabIndex = 1;
             this.okButton.Text = "Ok";
             this.okButton.UseVisualStyleBackColor = true;
             this.okButton.Click += new EventHandler(this.OkButton_Click);
-            //
+            // 
             // cancelButton
-            //
-            this.cancelButton.Location = new Point(715, 320);
+            // 
+            this.cancelButton.Anchor = ((AnchorStyles)((AnchorStyles.Bottom | AnchorStyles.Right)));
+            this.cancelButton.Location = new Point(713, 415);
             this.cancelButton.Name = "cancelButton";
-
-            // Update button
-            this.updateButton = new Button();
-            this.updateButton.Location = new Point(553, 320);
+            this.cancelButton.Size = new Size(75, 23);
+            this.cancelButton.TabIndex = 2;
+            this.cancelButton.Text = "Cancel";
+            this.cancelButton.UseVisualStyleBackColor = true;
+            this.cancelButton.Click += new EventHandler(this.CancelButton_Click);
+            // 
+            // updateButton
+            // 
+            this.updateButton.Anchor = ((AnchorStyles)((AnchorStyles.Bottom | AnchorStyles.Right)));
+            this.updateButton.Location = new Point(551, 415);
             this.updateButton.Name = "updateButton";
             this.updateButton.Size = new Size(75, 23);
             this.updateButton.TabIndex = 3;
             this.updateButton.Text = "Update All";
             this.updateButton.UseVisualStyleBackColor = true;
             this.updateButton.Click += new EventHandler(this.UpdateButton_Click);
-            this.cancelButton.Size = new Size(75, 23);
-            this.cancelButton.TabIndex = 2;
-            this.cancelButton.Text = "Cancel";
-            this.cancelButton.UseVisualStyleBackColor = true;
-            this.cancelButton.Click += new EventHandler(this.CancelButton_Click);
-            //
+            // 
             // ConfigForm
-            //
-            this.ClientSize = new Size(800, 350);
+            // 
+            this.AutoScaleDimensions = new SizeF(6F, 13F);
+            this.AutoScaleMode = AutoScaleMode.Font;
+            this.ClientSize = new Size(800, 450);
             this.Controls.Add(this.updateButton);
             this.Controls.Add(this.cancelButton);
             this.Controls.Add(this.okButton);
-            this.Controls.Add(this.playlistGrid);
-            this.StartPosition = FormStartPosition.CenterParent; // Center form on parent
-            this.KeyPreview = true; // Need to set KeyPreview to true to capture key events for the form
+            this.Controls.Add(this.playlistPanel);
+            this.MinimumSize = new Size(600, 400);
             this.Name = "ConfigForm";
-            this.Text = "Auto Update Playlist Order Configuration";
+            this.Text = "Auto-Update Playlist Order Configuration";
+            this.StartPosition = FormStartPosition.CenterParent;
+            this.KeyPreview = true;
             this.ResumeLayout(false);
+
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -108,82 +108,73 @@ namespace MusicBeePlugin
             return base.ProcessCmdKey(ref msg, keyData); // Let base class handle other keys
         }
 
-        private void PopulateGrid()
+        private void PopulatePlaylists()
         {
-            playlistGrid.Columns.Clear();
-            var playlistColumn = new DataGridViewComboBoxColumn 
-            { 
-                Name = "PlaylistName", 
-                HeaderText = "Playlist Name", 
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill 
+            playlistPanel.SuspendLayout();
+            playlistPanel.Controls.Clear();
+
+            // "AllPlaylists" as "Default Playlist Sort"
+            AddPlaylistControl("AllPlaylists", "Default Playlist Sort");
+
+            // Configured playlists
+            var configuredPlaylists = config.PlaylistConfig.Keys
+                .Where(p => p != "AllPlaylists")
+                .OrderBy(p => p)
+                .ToList();
+
+            if (configuredPlaylists.Any())
+            {
+                AddSectionHeader("Custom Playlist Sort Orders");
+                foreach (var playlistName in configuredPlaylists)
+                {
+                    AddPlaylistControl(playlistName, playlistName);
+                }
+            }
+
+            // Non-configured playlists
+            var allPlaylistNames = GetAllPlaylists().Select(p => p.Name).ToList();
+            var nonConfiguredPlaylists = allPlaylistNames
+                .Except(config.PlaylistConfig.Keys)
+                .OrderBy(p => p)
+                .ToList();
+
+            if (nonConfiguredPlaylists.Any())
+            {
+                AddSectionHeader("No Custom Order (using default)");
+                foreach (var playlistName in nonConfiguredPlaylists)
+                {
+                    AddPlaylistControl(playlistName, playlistName);
+                }
+            }
+
+            playlistPanel.ResumeLayout();
+        }
+
+        private void AddPlaylistControl(string playlistName, string displayName)
+        {
+            config.PlaylistConfig.TryGetValue(playlistName, out var ordersConfig);
+            var control = new PlaylistConfigControl(playlistName, displayName, ordersConfig)
+            {
+                Width = playlistPanel.ClientSize.Width - 10
             };
-            playlistGrid.Columns.Add(playlistColumn);
-            playlistGrid.CellValueChanged += PlaylistGrid_CellValueChanged;
-            playlistGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "OrderDisplay", HeaderText = "Order Configuration", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, ReadOnly = true }); // New text column
-            playlistGrid.Columns.Add(new DataGridViewButtonColumn { Name = "Order", HeaderText = "Order", Text = "Configure", UseColumnTextForButtonValue = true, Width = 100 }); // Configure button, always "Configure" text
-            playlistGrid.Columns.Add(new DataGridViewButtonColumn { Name = "-", HeaderText = "", Text = "-", UseColumnTextForButtonValue = true, Width = 50 });
-
-            var playlists = new List<string> { "AllPlaylists" };
-            playlists.AddRange(GetAllPlaylists().Select(p => p.Name));
-            playlistColumn.DataSource = playlists;
-            playlistColumn.DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton;
-            playlistColumn.DisplayStyleForCurrentCellOnly = false; // Ensure dropdown button is always visible
-
-            playlistGrid.Rows.Clear();
-            foreach (var playlistName in config.PlaylistConfig.Keys)
-            {
-                int rowIndex = playlistGrid.Rows.Add();
-                playlistGrid.Rows[rowIndex].Cells["PlaylistName"].Value = playlistName;
-                UpdateOrderDisplayCell(rowIndex, playlistName); // Populate the new text column
-            }
-            playlistGrid.AllowUserToAddRows = true; // Allow adding new rows after initial population
+            control.ConfigureClicked += OnConfigureClicked;
+            control.ClearClicked += OnClearClicked;
+            playlistPanel.Controls.Add(control);
         }
 
-        private void UpdateOrderDisplayCell(int rowIndex, string playlistName)
+        private void AddSectionHeader(string text)
         {
-            if (config.PlaylistConfig.TryGetValue(playlistName, out var orderConfig) && orderConfig.Orders.Count > 0)
+            var label = new Label
             {
-                playlistGrid.Rows[rowIndex].Cells["OrderDisplay"].Value = orderConfig.ToString();
-            }
-            else
-            {
-                playlistGrid.Rows[rowIndex].Cells["OrderDisplay"].Value = "Not Configured";
-            }
-        }
-
-
-        private void PlaylistGrid_CellContentClick(object sender, DataGridViewCellEventArgs e)
-        {
-            if (e.ColumnIndex == playlistGrid.Columns["Order"].Index && e.RowIndex >= 0 && e.RowIndex < playlistGrid.Rows.Count - 1)
-            {
-                string playlistName = playlistGrid.Rows[e.RowIndex].Cells["PlaylistName"].Value as string;
-                if (playlistName == null) return;
-
-                var currentOrderConfig = config.PlaylistConfig.TryGetValue(playlistName, out var existing) ? 
-                    existing : new OrdersConfig();
-                using (var orderConfigForm = new OrderConfigForm(currentOrderConfig.Orders.Select(o => (o.Order, o.Descending)).ToList(), playlistName))
-                {
-                    if (orderConfigForm.ShowDialog() == DialogResult.OK)
-                    {
-                        var newConfig = new OrdersConfig { 
-                            Orders = orderConfigForm.GetOrderConfig()
-                                .Select(o => new OrderItem(o.Order, o.Descending))
-                                .ToList() 
-                        };
-                        config.PlaylistConfig[playlistName] = newConfig;
-                        UpdateOrderDisplayCell(e.RowIndex, playlistName); // Update the text column after config changes
-                    }
-                }
-            }
-            else if (e.ColumnIndex == playlistGrid.Columns["-"].Index && e.RowIndex >= 0 && e.RowIndex < playlistGrid.Rows.Count - 1)
-            {
-                string playlistName = playlistGrid.Rows[e.RowIndex].Cells["PlaylistName"].Value as string;
-                if (playlistName != null)
-                {
-                    config.PlaylistConfig.Remove(playlistName);
-                    playlistGrid.Rows.RemoveAt(e.RowIndex);
-                }
-            }
+                Text = text,
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold, GraphicsUnit.Point, 0),
+                ForeColor = SystemColors.HotTrack,
+                AutoSize = false,
+                Size = new Size(playlistPanel.ClientSize.Width - 10, 30),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Margin = new Padding(3, 15, 3, 5)
+            };
+            playlistPanel.Controls.Add(label);
         }
 
         public Config GetConfig()
@@ -208,92 +199,36 @@ namespace MusicBeePlugin
             Close();
         }
 
-        private void PlaylistGrid_CellBeginEdit(object sender, DataGridViewCellCancelEventArgs e)
+        private void OnConfigureClicked(object sender, EventArgs e)
         {
-            if (e.ColumnIndex == playlistGrid.Columns["PlaylistName"].Index)
-            {
-                oldValue = playlistGrid.Rows[e.RowIndex].Cells["PlaylistName"].Value;
-                var playlistColumn = (DataGridViewComboBoxColumn)playlistGrid.Columns["PlaylistName"];
-                var playlists = new List<string> { "AllPlaylists" };
-                playlists.AddRange(GetAllPlaylists().Select(p => p.Name));
-                playlistColumn.DataSource = playlists;
-            }
-        }
+            var control = sender as PlaylistConfigControl;
+            if (control == null) return;
 
-        private void PlaylistGrid_UserDeletingRow(object sender, DataGridViewRowCancelEventArgs e)
-        {
-            if (e.Row.Cells["PlaylistName"].Value is string playlistName)
-            {
-                config.PlaylistConfig.Remove(playlistName);
-            }
-        }
+            var playlistName = control.PlaylistName;
 
-        private void PlaylistGrid_DataError(object sender, DataGridViewDataErrorEventArgs e)
-        {
-            if (e.Exception != null)
-            {
-                // Handle or ignore the error, prevents crash on combobox invalid value.
-                e.ThrowException = false; // Prevent exception from being thrown.
-                e.Cancel = false; // Do not cancel the cell edit.
-            }
-        }
+            var currentOrderConfig = config.GetOrderConfigForPlaylist(playlistName) ?? new OrdersConfig();
 
-        private void ConfigForm_Activated(object sender, EventArgs e)
-        {
-            if (!gridHasFocus)
+            using (var orderConfigForm = new OrderConfigForm(currentOrderConfig.Orders.Select(o => (o.Order, o.Descending)).ToList(), playlistName))
             {
-                this.playlistGrid.Focus();
-                gridHasFocus = true;
-            }
-        }
-
-        private void PlaylistGrid_MouseClick(object sender, MouseEventArgs e)
-        {
-            if (!gridHasFocus)
-            {
-                this.playlistGrid.Focus();
-                gridHasFocus = true;
-            }
-        }
-
-        private void PlaylistGrid_CurrentCellDirtyStateChanged(object sender, EventArgs e)
-        {
-            if (playlistGrid.IsCurrentCellDirty && 
-                playlistGrid.CurrentCell.ColumnIndex == playlistGrid.Columns["PlaylistName"].Index)
-            {
-                playlistGrid.CommitEdit(DataGridViewDataErrorContexts.Commit);
-            }
-        }
-
-        private void PlaylistGrid_CellValueChanged(object sender, DataGridViewCellEventArgs e)
-        {
-            if (e.ColumnIndex == playlistGrid.Columns["PlaylistName"].Index && e.RowIndex >= 0 && e.RowIndex < playlistGrid.Rows.Count - 1)
-            {
-                string newPlaylistName = playlistGrid.Rows[e.RowIndex].Cells["PlaylistName"].Value as string;
-                if (string.IsNullOrEmpty(newPlaylistName)) return;
-
-                foreach (DataGridViewRow row in playlistGrid.Rows)
+                if (orderConfigForm.ShowDialog(this) == DialogResult.OK)
                 {
-                    if (row.Index != e.RowIndex && !row.IsNewRow && row.Cells["PlaylistName"].Value as string == newPlaylistName)
-                    {
-                        MessageBox.Show($"Playlist '{newPlaylistName}' is already configured.", "Duplicate Playlist", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        playlistGrid.Rows[e.RowIndex].Cells["PlaylistName"].Value = oldValue;
-                        return;
-                    }
-                }
+                    var newOrders = orderConfigForm.GetOrderConfig()
+                        .Select(o => new OrderItem(o.Order, o.Descending))
+                        .ToList();
 
-                if (!string.IsNullOrEmpty(newPlaylistName))
-                {
-                    if (!config.PlaylistConfig.ContainsKey(newPlaylistName))
-                    {
-                        config.PlaylistConfig[newPlaylistName] = new OrdersConfig
-                        {
-                            Orders = new List<OrderItem> { new OrderItem("ManualOrder", false) }
-                        };
-                    }
-                    UpdateOrderDisplayCell(e.RowIndex, newPlaylistName);
+                    config.SetOrderConfigForPlaylist(playlistName, new OrdersConfig { Orders = newOrders });
+                    PopulatePlaylists();
                 }
             }
+        }
+
+        private void OnClearClicked(object sender, EventArgs e)
+        {
+            var control = sender as PlaylistConfigControl;
+            if (control == null) return;
+
+            config.SetOrderConfigForPlaylist(control.PlaylistName, null);
+            PopulatePlaylists();
         }
     }
 }

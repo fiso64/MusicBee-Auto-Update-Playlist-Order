@@ -95,7 +95,7 @@ namespace MusicBeePlugin
             orderGrid.Columns.Clear();
             orderGrid.Columns.Add(new DataGridViewComboBoxColumn { Name = "OrderType", HeaderText = "Order By", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
             orderGrid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Descending", HeaderText = "Descending", Width = 100 });
-            orderGrid.Columns.Add(new DataGridViewButtonColumn { Name = "Delete", HeaderText = "", Text = "Delete", UseColumnTextForButtonValue = true, Width = 50 });
+            orderGrid.Columns.Add(new DataGridViewButtonColumn { Name = "-", HeaderText = "", Text = "-", UseColumnTextForButtonValue = true, Width = 50 });
 
             DataGridViewComboBoxColumn orderTypeColumn = (DataGridViewComboBoxColumn)orderGrid.Columns["OrderType"];
             var orderTypes = new List<string> { "ManualOrder" }
@@ -119,7 +119,7 @@ namespace MusicBeePlugin
 
         private void OrderGrid_CellContentClick(object sender, DataGridViewCellEventArgs e)
         {
-            if (e.ColumnIndex == orderGrid.Columns["Delete"].Index && e.RowIndex >= 0 && e.RowIndex < orderGrid.Rows.Count - 1)
+            if (e.ColumnIndex == orderGrid.Columns["-"].Index && e.RowIndex >= 0 && e.RowIndex < orderGrid.Rows.Count - 1)
             {
                 orderGrid.Rows.RemoveAt(e.RowIndex);
             }

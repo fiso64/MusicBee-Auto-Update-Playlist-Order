@@ -121,7 +121,7 @@ namespace MusicBeePlugin
             playlistGrid.CellValueChanged += PlaylistGrid_CellValueChanged;
             playlistGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "OrderDisplay", HeaderText = "Order Configuration", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, ReadOnly = true }); // New text column
             playlistGrid.Columns.Add(new DataGridViewButtonColumn { Name = "Order", HeaderText = "Order", Text = "Configure", UseColumnTextForButtonValue = true, Width = 100 }); // Configure button, always "Configure" text
-            playlistGrid.Columns.Add(new DataGridViewButtonColumn { Name = "Delete", HeaderText = "", Text = "Delete", UseColumnTextForButtonValue = true, Width = 50 });
+            playlistGrid.Columns.Add(new DataGridViewButtonColumn { Name = "-", HeaderText = "", Text = "-", UseColumnTextForButtonValue = true, Width = 50 });
 
             var playlists = new List<string> { "AllPlaylists" };
             playlists.AddRange(GetAllPlaylists().Select(p => p.Name));
@@ -175,7 +175,7 @@ namespace MusicBeePlugin
                     }
                 }
             }
-            else if (e.ColumnIndex == playlistGrid.Columns["Delete"].Index && e.RowIndex >= 0 && e.RowIndex < playlistGrid.Rows.Count - 1)
+            else if (e.ColumnIndex == playlistGrid.Columns["-"].Index && e.RowIndex >= 0 && e.RowIndex < playlistGrid.Rows.Count - 1)
             {
                 string playlistName = playlistGrid.Rows[e.RowIndex].Cells["PlaylistName"].Value as string;
                 if (playlistName != null)

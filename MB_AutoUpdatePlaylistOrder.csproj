@@ -96,6 +96,9 @@
     <Compile Include="PlaylistConfigControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Include="OrderItemControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Include="DoubleBufferedFlowLayoutPanel.cs">
       <SubType>Component</SubType>
     </Compile>

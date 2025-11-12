@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Windows.Forms;
 
 
@@ -18,6 +19,31 @@ namespace MusicBeePlugin
         private Dictionary<string, HashSet<string>> playlistIndex = new Dictionary<string, HashSet<string>>();
         private Dictionary<string, System.Threading.Timer> debouncedTimers = new Dictionary<string, System.Threading.Timer>();
         private const int DEBOUNCE_MS = 500;
+
+        public Plugin()
+        {
+            // taken from https://github.com/sll552/DiscordBee/blob/master/DiscordBee.cs
+            AppDomain.CurrentDomain.AssemblyResolve += (object _, ResolveEventArgs args) =>
+            {
+                string assemblyFile = args.Name.Contains(",")
+                    ? args.Name.Substring(0, args.Name.IndexOf(','))
+                    : args.Name;
+
+                assemblyFile += ".dll";
+
+                string absoluteFolder = Path.GetDirectoryName(new Uri(Assembly.GetExecutingAssembly().CodeBase).LocalPath);
+                string targetPath = Path.Combine(absoluteFolder, "mb_AutoUpdatePlaylistOrder", assemblyFile);
+
+                try
+                {
+                    return Assembly.LoadFile(targetPath);
+                }
+                catch (Exception ex)
+                {
+                    return null;
+                }
+            };
+        }
 
         public PluginInfo Initialise(IntPtr apiInterfacePtr)
         {

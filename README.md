@@ -2,57 +2,55 @@
 
 This MusicBee plugin automatically updates the "natural" play order of static playlists based on your custom configurations.
 
-## Problem
+There are two primary reasons why you might need this plugin:
 
-MusicBee static playlists have a "natural play order" which is initially determined by the order tracks were added.  Sorting or shuffling playlists in MusicBee does not change this natural order. As explained in the MusicBee wiki:
+## Problem #1
+
+If you configured MusicBee to store playlists as M3U files instead of the proprietary MBP format (maybe because you want to sync playlists from elsewhere), it is not possible to set per-playlist sorting.
+
+This plugin allows you to configure sorting per-playlist when using M3U files.
+
+## Problem #2
+
+If you store playlists in MBP format and use the "auto-export static copy" feature, and if your playlists are not sorted in manual order, then the exported copy will not automatically update its order to match the sorted view in MusicBee.
+
+MusicBee playlists have a "natural play order" which is initially determined by the order tracks were added. Sorting or shuffling playlists in MusicBee does not change this natural order. As explained in the MusicBee wiki:
 
 > Every static playlist has an official track order, called its "natural order" or "playlist order", which by default is the order in which you added the tracks. When tracks are dragged to or sent to a playlist, they are always added to the end of Playlist Order. You can see the order if the # column is displayed in the main panel. Shuffling or sorting tracks will not change the natural order.
 > If it is not in order, you can choose "Update Play Order" in the List menu and it will be renumbered to match the current order.
 
-This can lead to unexpected results when exporting playlists (e.g., to m3u files) or syncing to external devices, as they will follow the natural play order, not the sorted view you see in MusicBee. You might have to manually use "List -> Update Play Order" for each playlist to fix this before syncing or exporting.
+This can lead to unexpected results when exporting playlists (e.g., to m3u files) or syncing to external devices, as they will follow the natural play order, not the sorted view you see in MusicBee. You have to manually use "List -> Update Play Order" for each playlist to fix this before syncing or exporting.
 
 This plugin can automate this "Update Play Order" step whenever a playlist is modified.
 
 ## How it works
 
-This plugin allows you to define sorting rules for specific playlists. When a configured playlist is updated (tracks added or removed), the plugin will:
-
-1. **Apply your defined sort criteria.**
-2. **Update the playlist's "natural play order"** to reflect the sorted order.
+This plugin allows you to define sorting rules for specific playlists. When a configured playlist is updated (tracks added or removed), the plugin will update the playlist's "natural play order".
 
 This ensures that the play order is always what you expect, even when exported or synced.
 
 ## Configuration
 
-1.  Go to **Preferences > Plugins**.
-2.  Find "Auto Update Playlist Order" and click **Configure**.
-3.  In the configuration window:
-    *   **Playlist Name**: Select a playlist from the dropdown.
-        * Select "AllPlaylists" to define default sorting rules for all playlists.
-        * Individual playlist configurations override the "AllPlaylists" default configuration.
-    *   **Order Configuration**: Click the "Configure" button to set up sorting rules for the selected playlist.
-        *   In the "Configure Playlist Order" window, you can add multiple sorting criteria. For each criterion:
-            *   **Order By**: Choose a tag or file property to sort by (e.g., "Date Added", "Album", "Artist").
-            *   **Descending**: Check if you want to sort in descending order.
-            *   **Manual Order**: 
-                * Use ascending to prevent a playlist from being affected by "AllPlaylists" sorting rules
-                * Use descending to add new tracks at the start of the playlist
+Go to **Preferences > Plugins**. Find "Auto Update Playlist Order" and click **Configure**.
+
+In the configuration window:
+
+*   **Playlist Name**: Select a playlist from the dropdown.
+    * Select "AllPlaylists" to define default sorting rules for all playlists.
+    * Individual playlist configurations override the "AllPlaylists" default configuration.
+*   **Order Configuration**: Click the "Configure" button to set up sorting rules for the selected playlist.
+    *   In the "Configure Playlist Order" window, you can add multiple sorting criteria. For each criterion:
+        *   **Order By**: Choose a tag or file property to sort by (e.g., "Date Added", "Album", "Artist").
+        *   **Descending**: Check if you want to sort in descending order.
+        *   **Manual Order**: 
+            * Use ascending to prevent a playlist from being affected by "AllPlaylists" sorting rules
+            * Use descending to add new tracks at the start of the playlist
 
 **Notes:**
 * You will need to update your configuration whenever you rename the playlists.
-* Manual Order (ascending) is only needed when you want to exclude a playlist from "AllPlaylists" sorting
-
-## Usage
-
-Once configured, the plugin will automatically update the play order of the specified playlists in the following situations:
-
-*   **Playlist Updated**: When you add or remove tracks from a configured playlist.
-*   **Configuration Changes**: When you modify the playlist configurations in the plugin's settings and click "Ok".
-*   **Manual Update**: Click the "Update All" button in the configuration window to force an update of all configured playlists.
+* "Manual Order (ascending)" corresponds to "Manual Order" sorting in MusicBee. Sorting a playlist by this is only useful when you want to exclude it from "AllPlaylists" sorting criteria.
 
 ## Installation
-
-**Note: The plugin is new and little testing has been done; it's recommended to back up your playlists first.**
 
 1.  Download the the latest release [here](https://github.com/fiso64/MusicBee-Auto-Update-Playlist-Order/releases).
 2.  Extract the files into the MusicBee Plugins folder (usually located at `MusicBee\Plugins`).

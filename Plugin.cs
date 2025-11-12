@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Windows.Forms;
 
 
@@ -13,7 +14,8 @@ namespace MusicBeePlugin
     {
         private static MusicBeeApiInterface mbApi;
         private PluginInfo about = new PluginInfo();
-        private ConfigForm configForm;
+        private static readonly object _configLock = new object();
+        private static bool isConfigOpen = false;
         private string configPath;
         private Config config = new Config();
         private Dictionary<string, HashSet<string>> playlistIndex = new Dictionary<string, HashSet<string>>();
@@ -103,27 +105,51 @@ namespace MusicBeePlugin
 
         public bool Configure(IntPtr panelHandle)
         {
-            var dataPath = mbApi.Setting_GetPersistentStoragePath();
-            configPath = Path.Combine(dataPath, "mb_AutoUpdatePlayOrder", "config.json");
-            config = Config.LoadFromPath(configPath);
-
-            configForm = new ConfigForm(mbApi, config);
-            configForm.UpdateAllPlaylists += (formConfig) => UpdatePlaylistsAll(formConfig);
-
-            DialogResult result = configForm.ShowDialog();
-
-            if (result == DialogResult.OK)
+            lock (_configLock)
             {
-                var oldConfig = config;
-                config = configForm.GetConfig();
-                Config.SaveConfig(config, configPath);
-
-                var changedPlaylists = config.GetModifiedPlaylists(oldConfig);
-                UpdatePlaylistsChanged(oldConfig, config, changedPlaylists);
+                if (isConfigOpen) return true;
+                isConfigOpen = true;
             }
 
-            configForm.Dispose();
-            configForm = null;
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    var dataPath = mbApi.Setting_GetPersistentStoragePath();
+                    configPath = Path.Combine(dataPath, "mb_AutoUpdatePlayOrder", "config.json");
+                    var formConfig = Config.LoadFromPath(configPath);
+
+                    using (var configForm = new ConfigForm(mbApi, formConfig))
+                    {
+                        configForm.UpdateAllPlaylists += (cfg) => UpdatePlaylistsAll(cfg);
+
+                        Application.Run(configForm);
+
+                        if (configForm.DialogResult == DialogResult.OK)
+                        {
+                            var oldConfig = config;
+                            var newConfig = configForm.GetConfig();
+                            
+                            Config.SaveConfig(newConfig, configPath);
+                            
+                            config = newConfig;
+
+                            var changedPlaylists = newConfig.GetModifiedPlaylists(oldConfig);
+                            UpdatePlaylistsChanged(oldConfig, newConfig, changedPlaylists);
+                        }
+                    }
+                }
+                finally
+                {
+                    lock (_configLock)
+                    {
+                        isConfigOpen = false;
+                    }
+                }
+            });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.IsBackground = true;
+            thread.Start();
 
             return true;
         }

@@ -13,7 +13,8 @@ namespace MusicBeePlugin
         public event Action<Config> UpdateAllPlaylists;
         private MusicBeeApiInterface mbApi;
         private Config config;
-        private FlowLayoutPanel playlistPanel;
+        private DoubleBufferedFlowLayoutPanel playlistPanel;
+        private TextBox searchTextBox;
         private Button okButton;
         private Button cancelButton;
         private Button updateButton;
@@ -24,15 +25,35 @@ namespace MusicBeePlugin
             this.config = new Config(config);
             InitializeComponent();
             PopulatePlaylists();
+            this.Load += ConfigForm_Load;
         }
 
         private void InitializeComponent()
         {
-            this.playlistPanel = new FlowLayoutPanel();
+            this.playlistPanel = new DoubleBufferedFlowLayoutPanel();
+            this.searchTextBox = new TextBox();
+            var searchLabel = new Label();
             this.okButton = new Button();
             this.cancelButton = new Button();
             this.updateButton = new Button();
             this.SuspendLayout();
+            // 
+            // searchLabel
+            // 
+            searchLabel.Anchor = ((AnchorStyles)((AnchorStyles.Top | AnchorStyles.Right)));
+            searchLabel.AutoSize = true;
+            searchLabel.Location = new Point(545, 15);
+            searchLabel.Name = "searchLabel";
+            searchLabel.Text = "Search:";
+            // 
+            // searchTextBox
+            // 
+            this.searchTextBox.Anchor = ((AnchorStyles)((AnchorStyles.Top | AnchorStyles.Right)));
+            this.searchTextBox.Location = new Point(595, 12);
+            this.searchTextBox.Name = "searchTextBox";
+            this.searchTextBox.Size = new Size(193, 20);
+            this.searchTextBox.TabIndex = 4;
+            this.searchTextBox.TextChanged += new EventHandler(this.SearchTextBox_TextChanged);
             // 
             // playlistPanel
             // 
@@ -40,12 +61,14 @@ namespace MusicBeePlugin
             | AnchorStyles.Left)
             | AnchorStyles.Right)));
             this.playlistPanel.AutoScroll = true;
-            this.playlistPanel.Location = new Point(12, 12);
+            this.playlistPanel.Location = new Point(12, 40);
             this.playlistPanel.Name = "playlistPanel";
-            this.playlistPanel.Size = new Size(776, 387);
+            this.playlistPanel.Size = new Size(776, 359);
             this.playlistPanel.TabIndex = 0;
             this.playlistPanel.FlowDirection = FlowDirection.TopDown;
             this.playlistPanel.WrapContents = false;
+            this.playlistPanel.Padding = new Padding(0, 0, 0, 0);
+            this.playlistPanel.Resize += new System.EventHandler(this.PlaylistPanel_Resize);
             // 
             // okButton
             // 
@@ -71,10 +94,10 @@ namespace MusicBeePlugin
             // 
             // updateButton
             // 
-            this.updateButton.Anchor = ((AnchorStyles)((AnchorStyles.Bottom | AnchorStyles.Right)));
-            this.updateButton.Location = new Point(551, 415);
+            this.updateButton.Anchor = ((AnchorStyles)((AnchorStyles.Top | AnchorStyles.Left)));
+            this.updateButton.Location = new Point(12, 11);
             this.updateButton.Name = "updateButton";
-            this.updateButton.Size = new Size(75, 23);
+            this.updateButton.Size = new Size(85, 23);
             this.updateButton.TabIndex = 3;
             this.updateButton.Text = "Update All";
             this.updateButton.UseVisualStyleBackColor = true;
@@ -84,7 +107,9 @@ namespace MusicBeePlugin
             // 
             this.AutoScaleDimensions = new SizeF(6F, 13F);
             this.AutoScaleMode = AutoScaleMode.Font;
-            this.ClientSize = new Size(800, 450);
+            this.ClientSize = new Size(800, 800);
+            this.Controls.Add(searchLabel);
+            this.Controls.Add(this.searchTextBox);
             this.Controls.Add(this.updateButton);
             this.Controls.Add(this.cancelButton);
             this.Controls.Add(this.okButton);
@@ -92,7 +117,7 @@ namespace MusicBeePlugin
             this.MinimumSize = new Size(600, 400);
             this.Name = "ConfigForm";
             this.Text = "Auto-Update Playlist Order Configuration";
-            this.StartPosition = FormStartPosition.CenterParent;
+            this.StartPosition = FormStartPosition.CenterScreen;
             this.KeyPreview = true;
             this.ResumeLayout(false);
 
@@ -113,14 +138,26 @@ namespace MusicBeePlugin
             playlistPanel.SuspendLayout();
             playlistPanel.Controls.Clear();
 
-            // "AllPlaylists" as "Default Playlist Sort"
-            AddPlaylistControl("AllPlaylists", "Default Playlist Sort");
+            var filterText = searchTextBox?.Text ?? "";
+
+            // "AllPlaylists" as "Default Playlist Sort" is only visible when not searching
+            if (string.IsNullOrEmpty(filterText))
+            {
+                AddPlaylistControl("AllPlaylists", "Default Playlist Sort");
+            }
 
             // Configured playlists
             var configuredPlaylists = config.PlaylistConfig.Keys
                 .Where(p => p != "AllPlaylists")
-                .OrderBy(p => p)
                 .ToList();
+
+            if (!string.IsNullOrEmpty(filterText))
+            {
+                configuredPlaylists = configuredPlaylists
+                    .Where(p => p.IndexOf(filterText, StringComparison.OrdinalIgnoreCase) >= 0)
+                    .ToList();
+            }
+            configuredPlaylists = configuredPlaylists.OrderBy(p => p).ToList();
 
             if (configuredPlaylists.Any())
             {
@@ -135,8 +172,15 @@ namespace MusicBeePlugin
             var allPlaylistNames = GetAllPlaylists().Select(p => p.Name).ToList();
             var nonConfiguredPlaylists = allPlaylistNames
                 .Except(config.PlaylistConfig.Keys)
-                .OrderBy(p => p)
                 .ToList();
+            
+            if (!string.IsNullOrEmpty(filterText))
+            {
+                nonConfiguredPlaylists = nonConfiguredPlaylists
+                    .Where(p => p.IndexOf(filterText, StringComparison.OrdinalIgnoreCase) >= 0)
+                    .ToList();
+            }
+            nonConfiguredPlaylists = nonConfiguredPlaylists.OrderBy(p => p).ToList();
 
             if (nonConfiguredPlaylists.Any())
             {
@@ -153,10 +197,8 @@ namespace MusicBeePlugin
         private void AddPlaylistControl(string playlistName, string displayName)
         {
             config.PlaylistConfig.TryGetValue(playlistName, out var ordersConfig);
-            var control = new PlaylistConfigControl(playlistName, displayName, ordersConfig)
-            {
-                Width = playlistPanel.ClientSize.Width - 10
-            };
+            var control = new PlaylistConfigControl(playlistName, displayName, ordersConfig);
+            control.Width = playlistPanel.ClientSize.Width - control.Margin.Horizontal;
             control.ConfigureClicked += OnConfigureClicked;
             control.ClearClicked += OnClearClicked;
             playlistPanel.Controls.Add(control);
@@ -170,10 +212,10 @@ namespace MusicBeePlugin
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold, GraphicsUnit.Point, 0),
                 ForeColor = SystemColors.HotTrack,
                 AutoSize = false,
-                Size = new Size(playlistPanel.ClientSize.Width - 10, 30),
                 TextAlign = ContentAlignment.MiddleLeft,
                 Margin = new Padding(3, 15, 3, 5)
             };
+            label.Size = new Size(playlistPanel.ClientSize.Width - label.Margin.Horizontal, 30);
             playlistPanel.Controls.Add(label);
         }
 
@@ -229,6 +271,49 @@ namespace MusicBeePlugin
 
             config.SetOrderConfigForPlaylist(control.PlaylistName, null);
             PopulatePlaylists();
+        }
+
+        private void SearchTextBox_TextChanged(object sender, EventArgs e)
+        {
+            PopulatePlaylists();
+        }
+
+        private void ConfigForm_Load(object sender, EventArgs e)
+        {
+            // On initial load with a custom ClientSize, the Anchor properties are not yet applied.
+            // We must manually calculate and set the final positions and sizes of anchored controls.
+
+            // --- 1. Reposition Bottom-Anchored Buttons ---
+            // In the designer, the form was 450px high and the buttons had Top=415.
+            // The distance from the TOP of the buttons to the BOTTOM of the form is 450 - 415 = 35px.
+            // We preserve this distance for our bottom-anchored (but not top-anchored) buttons.
+            const int buttonTopToBottomMargin = 35;
+            int newButtonTop = this.ClientSize.Height - buttonTopToBottomMargin;
+            okButton.Top = newButtonTop;
+            cancelButton.Top = newButtonTop;
+
+            // --- 2. Resize the Main Panel ---
+            // The panel is anchored to all four sides. Its height must stretch to fill the space.
+            // In the designer, panel Top=40 and its Bottom=399 (40+359).
+            // The distance from the panel's BOTTOM to the form's BOTTOM is 450 - 399 = 51px.
+            // We preserve this margin.
+            const int panelBottomMargin = 51;
+            this.playlistPanel.Height = this.ClientSize.Height - this.playlistPanel.Top - panelBottomMargin;
+
+            // --- 3. Lock Form Width ---
+            // This prevents horizontal resizing while allowing vertical resizing.
+            this.MinimumSize = new Size(this.Width, this.MinimumSize.Height);
+            this.MaximumSize = new Size(this.Width, Screen.PrimaryScreen.WorkingArea.Height);
+        }
+
+        private void PlaylistPanel_Resize(object sender, EventArgs e)
+        {
+            playlistPanel.SuspendLayout();
+            foreach (Control control in playlistPanel.Controls)
+            {
+                control.Width = playlistPanel.ClientSize.Width - control.Margin.Horizontal;
+            }
+            playlistPanel.ResumeLayout();
         }
     }
 }

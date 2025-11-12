@@ -96,6 +96,9 @@
     <Compile Include="PlaylistConfigControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Include="DoubleBufferedFlowLayoutPanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Plugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

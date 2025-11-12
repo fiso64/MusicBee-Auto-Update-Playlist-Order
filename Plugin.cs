@@ -367,7 +367,10 @@ namespace MusicBeePlugin
                 while (!string.IsNullOrEmpty(path))
                 {
                     if (staticOnly && path.EndsWith(".xautopf"))
+                    {
+                        path = mbApi.Playlist_QueryGetNextPlaylist();
                         continue;
+                    }
                     var name = mbApi.Playlist_GetName(path);
                     res.Add((name, path));
                     path = mbApi.Playlist_QueryGetNextPlaylist();

@@ -358,7 +358,7 @@ namespace MusicBeePlugin
             }
         }
 
-        public static List<(string Name, string Path)> GetAllPlaylists()
+        public static List<(string Name, string Path)> GetAllPlaylists(bool staticOnly=true)
         {
             var res = new List<(string Name, string Path)>();
             if (mbApi.Playlist_QueryPlaylists())
@@ -366,6 +366,8 @@ namespace MusicBeePlugin
                 var path = mbApi.Playlist_QueryGetNextPlaylist();
                 while (!string.IsNullOrEmpty(path))
                 {
+                    if (staticOnly && path.EndsWith(".xautopf"))
+                        continue;
                     var name = mbApi.Playlist_GetName(path);
                     res.Add((name, path));
                     path = mbApi.Playlist_QueryGetNextPlaylist();

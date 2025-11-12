@@ -26,6 +26,7 @@ namespace MusicBeePlugin
             InitializeComponent();
             PopulatePlaylists();
             this.Load += ConfigForm_Load;
+            this.KeyDown += new KeyEventHandler(this.ConfigForm_KeyDown);
         }
 
         private void InitializeComponent()
@@ -54,6 +55,7 @@ namespace MusicBeePlugin
             this.searchTextBox.Size = new Size(193, 20);
             this.searchTextBox.TabIndex = 4;
             this.searchTextBox.TextChanged += new EventHandler(this.SearchTextBox_TextChanged);
+            this.searchTextBox.KeyDown += new KeyEventHandler(this.SearchTextBox_KeyDown);
             // 
             // playlistPanel
             // 
@@ -108,6 +110,7 @@ namespace MusicBeePlugin
             this.AutoScaleDimensions = new SizeF(6F, 13F);
             this.AutoScaleMode = AutoScaleMode.Font;
             this.ClientSize = new Size(800, 800);
+            this.BackColor = Theme.FormBackColor;
             this.Controls.Add(searchLabel);
             this.Controls.Add(this.searchTextBox);
             this.Controls.Add(this.updateButton);
@@ -153,15 +156,16 @@ namespace MusicBeePlugin
 
             if (!string.IsNullOrEmpty(filterText))
             {
+                var searchTerms = filterText.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 configuredPlaylists = configuredPlaylists
-                    .Where(p => p.IndexOf(filterText, StringComparison.OrdinalIgnoreCase) >= 0)
+                    .Where(p => searchTerms.All(term => p.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0))
                     .ToList();
             }
             configuredPlaylists = configuredPlaylists.OrderBy(p => p).ToList();
 
             if (configuredPlaylists.Any())
             {
-                AddSectionHeader("Custom Playlist Sort Orders");
+                AddSectionHeader("Sorted Playlists");
                 foreach (var playlistName in configuredPlaylists)
                 {
                     AddPlaylistControl(playlistName, playlistName);
@@ -176,15 +180,16 @@ namespace MusicBeePlugin
             
             if (!string.IsNullOrEmpty(filterText))
             {
+                var searchTerms = filterText.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 nonConfiguredPlaylists = nonConfiguredPlaylists
-                    .Where(p => p.IndexOf(filterText, StringComparison.OrdinalIgnoreCase) >= 0)
+                    .Where(p => searchTerms.All(term => p.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0))
                     .ToList();
             }
             nonConfiguredPlaylists = nonConfiguredPlaylists.OrderBy(p => p).ToList();
 
             if (nonConfiguredPlaylists.Any())
             {
-                AddSectionHeader("No Custom Order (using default)");
+                AddSectionHeader("Unsorted Playlists (using default)");
                 foreach (var playlistName in nonConfiguredPlaylists)
                 {
                     AddPlaylistControl(playlistName, playlistName);
@@ -250,13 +255,11 @@ namespace MusicBeePlugin
 
             var currentOrderConfig = config.GetOrderConfigForPlaylist(playlistName) ?? new OrdersConfig();
 
-            using (var orderConfigForm = new OrderConfigForm(currentOrderConfig.Orders.Select(o => (o.Order, o.Descending)).ToList(), playlistName))
+            using (var orderConfigForm = new OrderConfigForm(currentOrderConfig, playlistName, this.config))
             {
                 if (orderConfigForm.ShowDialog(this) == DialogResult.OK)
                 {
-                    var newOrders = orderConfigForm.GetOrderConfig()
-                        .Select(o => new OrderItem(o.Order, o.Descending))
-                        .ToList();
+                    var newOrders = orderConfigForm.GetOrderConfig().Orders;
 
                     config.SetOrderConfigForPlaylist(playlistName, new OrdersConfig { Orders = newOrders });
                     PopulatePlaylists();
@@ -314,6 +317,34 @@ namespace MusicBeePlugin
                 control.Width = playlistPanel.ClientSize.Width - control.Margin.Horizontal;
             }
             playlistPanel.ResumeLayout();
+        }
+
+        private void ConfigForm_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (this.ActiveControl is TextBox && this.ActiveControl != searchTextBox)
+                return;
+
+            if ((e.Control && e.KeyCode == Keys.F) || (e.Alt && e.KeyCode == Keys.D))
+            {
+                searchTextBox.Focus();
+                searchTextBox.SelectAll();
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+            }
+        }
+
+        private void SearchTextBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                var firstResult = playlistPanel.Controls.OfType<PlaylistConfigControl>().FirstOrDefault();
+                if (firstResult != null)
+                {
+                    OnConfigureClicked(firstResult, EventArgs.Empty);
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                }
+            }
         }
     }
 }

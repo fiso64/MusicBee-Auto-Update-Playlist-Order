@@ -13,13 +13,17 @@ namespace MusicBeePlugin
         private List<string> orderTypes;
         private DoubleBufferedFlowLayoutPanel orderPanel;
         private Button addButton;
+        private Button insertCommonButton;
+        private ContextMenuStrip commonOrdersMenu;
         private Panel buttonContainer;
         private Button okButton;
         private Button cancelButton;
+        private Config allConfigs;
 
-        public OrderConfigForm(List<(string Order, bool Descending)> config, string playlistName = null)
+        public OrderConfigForm(OrdersConfig currentConfig, string playlistName, Config allConfigs)
         {
-            orderConfig = new List<(string Order, bool Descending)>(config); // Create a copy to work on
+            this.orderConfig = currentConfig.Orders.Select(o => (o.Order, o.Descending)).ToList(); // Create a copy
+            this.allConfigs = allConfigs;
             InitializeComponent();
             this.Text = string.IsNullOrEmpty(playlistName) 
                 ? "Configure Playlist Order" 
@@ -47,6 +51,8 @@ namespace MusicBeePlugin
             this.orderPanel.WrapContents = false;
             this.orderPanel.Resize += new EventHandler(this.OrderPanel_Resize);
             this.buttonContainer = new Panel();
+            this.insertCommonButton = new Button();
+            this.commonOrdersMenu = new ContextMenuStrip();
             //
             // buttonContainer
             //
@@ -63,10 +69,25 @@ namespace MusicBeePlugin
             this.addButton.Text = "+ Add Rule";
             this.addButton.UseVisualStyleBackColor = true;
             this.addButton.Click += new EventHandler(this.AddButton_Click);
-            // Calculate location based on parent container size to avoid being pushed off-screen
+            //
+            // insertCommonButton
+            //
+            this.insertCommonButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            this.insertCommonButton.Name = "insertCommonButton";
+            this.insertCommonButton.Size = new Size(120, 30);
+            this.insertCommonButton.TabIndex = 1;
+            this.insertCommonButton.Text = "Insert Common...";
+            this.insertCommonButton.UseVisualStyleBackColor = true;
+            this.insertCommonButton.Click += new EventHandler(this.InsertCommonButton_Click);
+            this.insertCommonButton.Visible = false; // Initially hidden
+            //
+            // Reposition buttons
+            //
             this.addButton.Location = new Point(this.buttonContainer.ClientSize.Width - this.addButton.Width - 3, 5);
-            
+            this.insertCommonButton.Location = new Point(this.addButton.Location.X - this.insertCommonButton.Width - 6, 5);
+
             this.buttonContainer.Controls.Add(this.addButton);
+            this.buttonContainer.Controls.Add(this.insertCommonButton);
             // 
             // okButton
             // 
@@ -96,6 +117,7 @@ namespace MusicBeePlugin
             this.AcceptButton = this.okButton;
             this.CancelButton = this.cancelButton;
             this.ClientSize = new Size(600, 300);
+            this.BackColor = Theme.FormBackColor;
             this.Controls.Add(this.cancelButton);
             this.Controls.Add(this.okButton);
             this.Controls.Add(this.orderPanel);
@@ -113,6 +135,11 @@ namespace MusicBeePlugin
             // This prevents horizontal resizing while allowing vertical resizing.
             this.MinimumSize = new Size(this.Width, this.MinimumSize.Height);
             this.MaximumSize = new Size(this.Width, Screen.PrimaryScreen.WorkingArea.Height);
+
+            if (insertCommonButton.Visible)
+            {
+                this.ActiveControl = insertCommonButton;
+            }
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -147,8 +174,16 @@ namespace MusicBeePlugin
             buttonContainer.Width = orderPanel.ClientSize.Width - buttonContainer.Margin.Horizontal;
             orderPanel.Controls.Add(buttonContainer);
 
+            UpdateCommonButtonVisibility();
             UpdateMoveButtonsState();
             orderPanel.ResumeLayout();
+        }
+
+        private void UpdateCommonButtonVisibility()
+        {
+            bool hasDisplayedRules = orderPanel.Controls.OfType<OrderItemControl>().Any();
+            bool hasCommonConfigs = allConfigs.PlaylistConfig.Values.Any(oc => oc.Orders.Any());
+            insertCommonButton.Visible = !hasDisplayedRules && hasCommonConfigs;
         }
         
         private OrderItemControl CreateAndWireUpNewControl((string Order, bool Descending) orderItem)
@@ -169,7 +204,42 @@ namespace MusicBeePlugin
             return orderPanel.Controls.OfType<OrderItemControl>().Select(c => c.OrderItem).ToList();
         }
 
-        public List<(string Order, bool Descending)> GetOrderConfig() => orderConfig;
+        public OrdersConfig GetOrderConfig()
+        {
+            return new OrdersConfig { Orders = BuildOrderConfigFromUi().Select(o => new OrderItem(o.Order, o.Descending)).ToList() };
+        }
+
+        private void InsertCommonButton_Click(object sender, EventArgs e)
+        {
+            commonOrdersMenu.Items.Clear();
+
+            var commonOrders = allConfigs.PlaylistConfig.Values
+                .Where(oc => oc.Orders.Any())
+                .GroupBy(oc => oc)
+                .Select(g => new { Config = g.Key, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .ToList();
+
+            if (!commonOrders.Any()) return;
+
+            foreach (var item in commonOrders)
+            {
+                var menuItem = new ToolStripMenuItem(item.Config.ToString()) { Tag = item.Config };
+                menuItem.Click += CommonOrderItem_Click;
+                commonOrdersMenu.Items.Add(menuItem);
+            }
+            
+            commonOrdersMenu.Show(insertCommonButton, new Point(0, insertCommonButton.Height));
+        }
+        
+        private void CommonOrderItem_Click(object sender, EventArgs e)
+        {
+            if (sender is ToolStripMenuItem clickedItem && clickedItem.Tag is OrdersConfig selectedConfig)
+            {
+                this.orderConfig = selectedConfig.Orders.Select(o => (o.Order, o.Descending)).ToList();
+                PopulateOrderItems();
+            }
+        }
 
         private void AddButton_Click(object sender, EventArgs e)
         {
@@ -184,6 +254,7 @@ namespace MusicBeePlugin
             orderPanel.ResumeLayout(true);
 
             UpdateMoveButtonsState();
+            UpdateCommonButtonVisibility();
             orderPanel.ScrollControlIntoView(newControl);
         }
 
@@ -197,6 +268,7 @@ namespace MusicBeePlugin
                 control.Dispose();
                 orderPanel.ResumeLayout(true);
                 UpdateMoveButtonsState();
+                UpdateCommonButtonVisibility();
             }
         }
 

@@ -86,7 +86,10 @@ namespace MusicBeePlugin
             configPath = Path.Combine(dataPath, "mb_AutoUpdatePlayOrder", "config.json");
             config = Config.LoadFromPath(configPath);
 
-            LoadManualDescendingPlaylists();   
+            LoadManualDescendingPlaylists();
+
+            mbApi.MB_RegisterCommand("Auto Update Playlist Order: Open Configuration", (a, b) => Configure(IntPtr.Zero));
+            mbApi.MB_RegisterCommand("Auto Update Playlist Order: Update All Playlists", (a, b) => UpdatePlaylistsAll(config));
         }
 
         private void LoadManualDescendingPlaylists()
@@ -164,15 +167,15 @@ namespace MusicBeePlugin
             var allPlaylists = GetAllPlaylists();
             var modifiedConfigPlaylists = changedPlaylists.Where(x => newConfig.PlaylistConfig.ContainsKey(x));
 
-    foreach (var changed in modifiedConfigPlaylists.Where(x => newConfig.PlaylistConfig[x].IsManualDescending))
-    {
-        var playlistInfo = allPlaylists.FirstOrDefault(p => p.Name == changed);
-        if (playlistInfo.Path != null)
-        {
-            mbApi.Playlist_QueryFilesEx(playlistInfo.Path, out string[] files);
-            playlistIndex[changed] = new HashSet<string>(files);
-        }
-    }
+            foreach (var changed in modifiedConfigPlaylists.Where(x => newConfig.PlaylistConfig[x].IsManualDescending))
+            {
+                var playlistInfo = allPlaylists.FirstOrDefault(p => p.Name == changed);
+                if (playlistInfo.Path != null)
+                {
+                    mbApi.Playlist_QueryFilesEx(playlistInfo.Path, out string[] files);
+                    playlistIndex[changed] = new HashSet<string>(files);
+                }
+            }
 
             if (changedPlaylists.Contains("AllPlaylists"))
             {

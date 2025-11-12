@@ -52,7 +52,8 @@ namespace MusicBeePlugin
             // 
             this.Size = new Size(560, 45);
             this.Margin = new Padding(3, 3, 3, 0);
-            this.BorderStyle = BorderStyle.FixedSingle;
+            this.BackColor = Theme.FormBackColor;
+            this.BorderStyle = BorderStyle.None;
             // 
             // _orderTypeComboBox
             // 
@@ -121,6 +122,15 @@ namespace MusicBeePlugin
             this.Controls.Add(this._orderTypeComboBox);
             this.ResumeLayout(false);
             this.PerformLayout();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            using (var pen = new Pen(Theme.ListItemSeparatorColor, 1))
+            {
+                e.Graphics.DrawLine(pen, 0, this.Height - 1, this.Width, this.Height - 1);
+            }
         }
     }
 }

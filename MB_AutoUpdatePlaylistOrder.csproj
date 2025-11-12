@@ -104,6 +104,7 @@
     </Compile>
     <Compile Include="Plugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Theme.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

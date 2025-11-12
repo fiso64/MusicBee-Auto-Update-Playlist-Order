@@ -57,18 +57,52 @@ namespace MusicBeePlugin
             return string.Join(", ", Orders.Select(o => o.ToString()));
         }
 
-        public bool Equals(OrdersConfig config2)
+        public bool Equals(OrdersConfig other)
         {
-            if (this.Orders.Count != config2.Orders.Count) return false;
+            if (other is null) return false;
+            if (ReferenceEquals(this, other)) return true;
+            return this.Orders.SequenceEqual(other.Orders, new OrderItemComparer());
+        }
 
-            for (int i = 0; i < this.Orders.Count; i++)
+        public override bool Equals(object obj)
+        {
+            return Equals(obj as OrdersConfig);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
             {
-                if (this.Orders[i].Order != config2.Orders[i].Order ||
-                    this.Orders[i].Descending != config2.Orders[i].Descending)
-                    return false;
+                int hashCode = 17;
+                foreach (var item in Orders)
+                {
+                    hashCode = hashCode * 31 + (item.Order?.GetHashCode() ?? 0);
+                    hashCode = hashCode * 31 + item.Descending.GetHashCode();
+                }
+                return hashCode;
             }
+        }
+    }
 
-            return true;
+    // Helper comparer for SequenceEqual
+    public class OrderItemComparer : IEqualityComparer<OrderItem>
+    {
+        public bool Equals(OrderItem x, OrderItem y)
+        {
+            if (ReferenceEquals(x, y)) return true;
+            if (x is null || y is null) return false;
+            return x.Order == y.Order && x.Descending == y.Descending;
+        }
+
+        public int GetHashCode(OrderItem obj)
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 23 + (obj.Order?.GetHashCode() ?? 0);
+                hash = hash * 23 + obj.Descending.GetHashCode();
+                return hash;
+            }
         }
     }
 

@@ -58,8 +58,8 @@ namespace MusicBeePlugin
             // PlaylistConfigControl
             this.Size = new Size(750, 45);
             this.Margin = new Padding(3, 3, 3, 0);
-            this.BackColor = SystemColors.Control;
-            this.BorderStyle = BorderStyle.FixedSingle;
+            this.BackColor = Theme.FormBackColor;
+            this.BorderStyle = BorderStyle.None;
             this.Cursor = Cursors.Hand;
 
             // _playlistNameLabel
@@ -155,8 +155,17 @@ namespace MusicBeePlugin
             }
             else
             {
-                _orderDisplayLabel.Text = "Using default sort order";
+                _orderDisplayLabel.Text = "";
                 _clearButton.Visible = false;
+            }
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            using (var pen = new Pen(Theme.ListItemSeparatorColor, 1))
+            {
+                e.Graphics.DrawLine(pen, 0, this.Height - 1, this.Width, this.Height - 1);
             }
         }
     }

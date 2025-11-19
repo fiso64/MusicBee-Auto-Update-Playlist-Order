@@ -110,6 +110,7 @@ namespace MusicBeePlugin
     {
         public Dictionary<string, OrdersConfig> PlaylistConfig { get; set; } = new Dictionary<string, OrdersConfig>();
         public bool M3uFileListenerEnabled { get; set; }
+        public bool M3uUseRelativePaths { get; set; } = true;
 
         public Config()
         {
@@ -118,6 +119,7 @@ namespace MusicBeePlugin
         public Config(Config other)
         {
             M3uFileListenerEnabled = other.M3uFileListenerEnabled;
+            M3uUseRelativePaths = other.M3uUseRelativePaths;
             foreach (var kvp in other.PlaylistConfig)
             {
                 PlaylistConfig[kvp.Key] = new OrdersConfig(kvp.Value);

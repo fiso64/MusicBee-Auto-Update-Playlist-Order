@@ -462,7 +462,32 @@ namespace MusicBeePlugin
                         encoding = System.Text.Encoding.UTF8;
 
                     var newContentLines = new List<string>();
-                    newContentLines.AddRange(files.Select(f => f.Replace('\\', '/')));
+
+                    if (config.M3uUseRelativePaths)
+                    {
+                        Uri playlistUri = new Uri(playlistPath);
+                        newContentLines.AddRange(files.Select(f =>
+                        {
+                            try
+                            {
+                                Uri fileUri = new Uri(f);
+                                Uri relativeUri = playlistUri.MakeRelativeUri(fileUri);
+                                if (relativeUri.IsAbsoluteUri)
+                                {
+                                    return f.Replace('\\', '/');
+                                }
+                                return Uri.UnescapeDataString(relativeUri.ToString());
+                            }
+                            catch
+                            {
+                                return f.Replace('\\', '/');
+                            }
+                        }));
+                    }
+                    else
+                    {
+                        newContentLines.AddRange(files.Select(f => f.Replace('\\', '/')));
+                    }
 
                     if (File.Exists(playlistPath))
                     {

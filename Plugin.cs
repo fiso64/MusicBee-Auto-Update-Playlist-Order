@@ -289,17 +289,17 @@ namespace MusicBeePlugin
 
             void ProcessWithErrorHandling()
             {
-                if (!force && playlistIndex.TryGetValue(playlistName, out var previousFilesHashSet))
-                {
-                    mbApi.Playlist_QueryFilesEx(url, out string[] currentFiles);
-                    var currentFilesHashSet = new HashSet<string>(currentFiles);
+                //if (!force && playlistIndex.TryGetValue(playlistName, out var previousFilesHashSet))
+                //{
+                //    mbApi.Playlist_QueryFilesEx(url, out string[] currentFiles);
+                //    var currentFilesHashSet = new HashSet<string>(currentFiles);
 
-                    if (currentFilesHashSet.IsSubsetOf(previousFilesHashSet))
-                    {
-                        playlistIndex[playlistName] = currentFilesHashSet;
-                        return; // No new items have been added, no need to sort
-                    }
-                }
+                //    if (currentFilesHashSet.IsSubsetOf(previousFilesHashSet))
+                //    {
+                //        playlistIndex[playlistName] = currentFilesHashSet;
+                //        return; // No new items have been added, no need to sort
+                //    }
+                //}
 
                 try
                 {

@@ -31,8 +31,8 @@ This ensures that the play order is always what you expect, even when exported o
 
 **Note:** You will need to update your configuration whenever you rename the playlists.
 
-**Filesystem watcher mode:**
-If you have configured your playlists to be stored in M3U format (e.g., syncing), then via the cogwheel in the settings page you can enable the file system watcher mode. In this mode, the plugin will detect and re-sort playlists even when they're modified externally. You can also enforce forward slashes for all M3U playlists to ensure cross-platform compatibility.
+## Filesystem watcher mode
+If you have configured your playlists to be stored in M3U format (e.g., for syncing), then you can enable the filesystem watcher. In this mode, the plugin will detect and re-sort playlists even when they're modified externally. You can also enforce forward slashes for all M3U playlists to ensure cross-platform compatibility.
 
 ## Installation
 

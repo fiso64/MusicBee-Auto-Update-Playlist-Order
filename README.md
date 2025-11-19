@@ -1,6 +1,6 @@
 ## Playlist Sync & Sort Utils Plugin for MusicBee
 
-This MusicBee plugin automatically updates the "natural" play order of static playlists based on your custom configurations.
+This MusicBee plugin automatically updates the "natural" play order of static playlists based on your custom configurations. It also provides some useful functions when syncing playlists to and from other software or machines.
 
 There are two primary reasons why you might need this plugin:
 

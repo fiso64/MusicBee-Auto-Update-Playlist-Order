@@ -80,6 +80,9 @@ namespace MusicBeePlugin
             this.Controls.Add(okButton);
             this.Controls.Add(cancelButton);
             
+            this.CancelButton = cancelButton;
+            this.AcceptButton = okButton;
+
             this.Name = "M3uConfigForm";
             this.Text = "M3U Configuration";
             this.StartPosition = FormStartPosition.CenterParent;

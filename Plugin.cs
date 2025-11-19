@@ -181,8 +181,10 @@ namespace MusicBeePlugin
                 var playlistInfo = allPlaylists.FirstOrDefault(p => p.Name == playlist.Key);
                 if (playlistInfo.Path != null)
                 {
-                    mbApi.Playlist_QueryFilesEx(playlistInfo.Path, out string[] files);
-                    playlistIndex[playlist.Key] = new HashSet<string>(files);
+                    if (QueryPlaylistFiles(playlistInfo.Path, out string[] files))
+                    {
+                        playlistIndex[playlist.Key] = new HashSet<string>(files);
+                    }
                 }
             }
         }
@@ -258,8 +260,10 @@ namespace MusicBeePlugin
                 var playlistInfo = allPlaylists.FirstOrDefault(p => p.Name == changed);
                 if (playlistInfo.Path != null)
                 {
-                    mbApi.Playlist_QueryFilesEx(playlistInfo.Path, out string[] files);
-                    playlistIndex[changed] = new HashSet<string>(files);
+                    if (QueryPlaylistFiles(playlistInfo.Path, out string[] files))
+                    {
+                        playlistIndex[changed] = new HashSet<string>(files);
+                    }
                 }
             }
 
@@ -365,19 +369,20 @@ namespace MusicBeePlugin
 
             if (orderConfig.IsManualDescending)
             {
-                mbApi.Playlist_QueryFilesEx(playlistUrl, out string[] currentFiles);
-
-                var previousFiles = playlistIndex[playlistName];
-                var newFiles = currentFiles.Where(f => !previousFiles.Contains(f)).ToArray();
-                
-                playlistIndex[playlistName] = new HashSet<string>(currentFiles);
-                
-                if (newFiles.Any())
+                if (QueryPlaylistFiles(playlistUrl, out string[] currentFiles))
                 {
-                    Debug.WriteLine($"Prepending new files to playlist {playlistName}");
-                    var existingFiles = currentFiles.Except(newFiles).ToList();
-                    var result = newFiles.Concat(existingFiles).ToList();
-                    mbApi.Playlist_SetFiles(playlistUrl, result.ToArray());
+                    var previousFiles = playlistIndex[playlistName];
+                    var newFiles = currentFiles.Where(f => !previousFiles.Contains(f)).ToArray();
+
+                    playlistIndex[playlistName] = new HashSet<string>(currentFiles);
+
+                    if (newFiles.Any())
+                    {
+                        Debug.WriteLine($"Prepending new files to playlist {playlistName}");
+                        var existingFiles = currentFiles.Except(newFiles).ToList();
+                        var result = newFiles.Concat(existingFiles).ToList();
+                        SetPlaylistFiles(playlistUrl, result.ToArray());
+                    }
                 }
                 
                 return;
@@ -385,7 +390,7 @@ namespace MusicBeePlugin
 
             Debug.WriteLine($"Updating playlist {playlistName} with sort order {orderConfig}");
 
-            mbApi.Playlist_QueryFilesEx(playlistUrl, out string[] files);
+            if (!QueryPlaylistFiles(playlistUrl, out string[] files)) return;
             if (files == null || files.Length == 0) return;
 
             IOrderedEnumerable<string> orderedFiles = null;
@@ -399,8 +404,93 @@ namespace MusicBeePlugin
             if (orderedFiles != null)
             {
                 playlistIndex[playlistName] = new HashSet<string>(orderedFiles);
-                mbApi.Playlist_SetFiles(playlistUrl, orderedFiles.ToArray()); // This will send a PlaylistUpdated notification
+                SetPlaylistFiles(playlistUrl, orderedFiles.ToArray());
             }
+        }
+
+        private bool QueryPlaylistFiles(string playlistPath, out string[] files)
+        {
+            if (config.M3uFileListenerEnabled && (playlistPath.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase) || playlistPath.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase)))
+            {
+                try
+                {
+                    var lines = File.ReadAllLines(playlistPath);
+                    var dir = Path.GetDirectoryName(playlistPath);
+                    var result = new List<string>();
+                    foreach (var line in lines)
+                    {
+                        var trimmed = line.Trim();
+                        if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("#")) continue;
+
+                        try
+                        {
+                            string path = trimmed;
+                            // Handle file URI if present
+                            if (path.StartsWith("file:///", StringComparison.OrdinalIgnoreCase))
+                            {
+                                try { path = new Uri(path).LocalPath; } catch { }
+                            }
+
+                            if (!Path.IsPathRooted(path))
+                            {
+                                path = Path.GetFullPath(Path.Combine(dir, path));
+                            }
+                            result.Add(path);
+                        }
+                        catch { }
+                    }
+                    files = result.ToArray();
+                    return true;
+                }
+                catch
+                {
+                    files = new string[0];
+                    return false;
+                }
+            }
+            return mbApi.Playlist_QueryFilesEx(playlistPath, out files);
+        }
+
+        private bool SetPlaylistFiles(string playlistPath, string[] files)
+        {
+            if (config.M3uFileListenerEnabled && (playlistPath.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase) || playlistPath.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase)))
+            {
+                try
+                {
+                    var encoding = System.Text.Encoding.Default;
+                    if (playlistPath.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase))
+                        encoding = System.Text.Encoding.UTF8;
+
+                    var newContentLines = new List<string>();
+                    newContentLines.AddRange(files.Select(f => f.Replace('\\', '/')));
+
+                    if (File.Exists(playlistPath))
+                    {
+                        var existingLines = File.ReadAllLines(playlistPath);
+                        var existingNonEmpty = existingLines.Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+                        
+                        if (existingNonEmpty.SequenceEqual(newContentLines))
+                        {
+                            return true;
+                        }
+                    }
+
+                    using (var sw = new StreamWriter(playlistPath, false, encoding))
+                    {
+                        foreach (var line in newContentLines)
+                        {
+                            sw.WriteLine(line);
+                        }
+                    }
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error writing M3U: {ex.Message}");
+                    return false;
+                }
+            }
+            return mbApi.Playlist_SetFiles(playlistPath, files);
         }
 
         private IOrderedEnumerable<string> ApplySortOrder(IOrderedEnumerable<string> currentOrder, string[] files, string order, bool descending)

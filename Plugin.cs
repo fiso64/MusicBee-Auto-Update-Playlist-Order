@@ -61,7 +61,7 @@ namespace MusicBeePlugin
             mbApi = new MusicBeeApiInterface();
             mbApi.Initialise(apiInterfacePtr);
             about.PluginInfoVersion = PluginInfoVersion;
-            about.Name = "Auto Update Playlist Order";
+            about.Name = "Playlist Sync & Sort Utils";
             about.Description = "Allows to automatically update a playlist's play order";
             about.Author = "fiso64";
             about.TargetApplication = "";
@@ -100,8 +100,8 @@ namespace MusicBeePlugin
             LoadManualDescendingPlaylists();
             InitializeFileListener();
 
-            mbApi.MB_RegisterCommand("Auto Update Playlist Order: Open Configuration", (a, b) => Configure(IntPtr.Zero));
-            mbApi.MB_RegisterCommand("Auto Update Playlist Order: Update All Playlists", (a, b) => UpdatePlaylistsAll(config));
+            mbApi.MB_RegisterCommand("Playlist Sync & Sort Utils: Open Configuration", (a, b) => Configure(IntPtr.Zero));
+            mbApi.MB_RegisterCommand("Playlist Sync & Sort Utils: Update All Playlists", (a, b) => UpdatePlaylistsAll(config));
 
             if (config.M3uFileListenerEnabled)
             {

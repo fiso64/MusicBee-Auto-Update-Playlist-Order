@@ -1,4 +1,4 @@
-## Auto Update Playlist Order Plugin for MusicBee
+## Playlist Sync & Sort Utils Plugin for MusicBee
 
 This MusicBee plugin automatically updates the "natural" play order of static playlists based on your custom configurations.
 

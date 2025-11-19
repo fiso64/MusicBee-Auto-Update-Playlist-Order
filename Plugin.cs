@@ -75,6 +75,7 @@ namespace MusicBeePlugin
                     Startup();
                     break;
                 case NotificationType.PlaylistUpdated:
+                case NotificationType.PlaylistCreated:
                     UpdatePlaylistPlayOrder(sourceFileUrl, config);
                     break;
             }

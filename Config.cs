@@ -109,6 +109,7 @@ namespace MusicBeePlugin
     public class Config
     {
         public Dictionary<string, OrdersConfig> PlaylistConfig { get; set; } = new Dictionary<string, OrdersConfig>();
+        public bool M3uFileListenerEnabled { get; set; }
 
         public Config()
         {
@@ -116,6 +117,7 @@ namespace MusicBeePlugin
 
         public Config(Config other)
         {
+            M3uFileListenerEnabled = other.M3uFileListenerEnabled;
             foreach (var kvp in other.PlaylistConfig)
             {
                 PlaylistConfig[kvp.Key] = new OrdersConfig(kvp.Value);

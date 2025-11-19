@@ -20,6 +20,7 @@ namespace MusicBeePlugin
         private Config config = new Config();
         private Dictionary<string, HashSet<string>> playlistIndex = new Dictionary<string, HashSet<string>>();
         private Dictionary<string, System.Threading.Timer> debouncedTimers = new Dictionary<string, System.Threading.Timer>();
+        private FileSystemWatcher m3uWatcher;
         private const int DEBOUNCE_MS = 500;
 
         public Plugin()
@@ -76,7 +77,12 @@ namespace MusicBeePlugin
                     break;
                 case NotificationType.PlaylistUpdated:
                 case NotificationType.PlaylistCreated:
-                    UpdatePlaylistPlayOrder(sourceFileUrl, config);
+                    // If listener is enabled, we ignore MB events for playlists (to avoid loops/redundancy),
+                    // relying instead on the file system watcher.
+                    if (!config.M3uFileListenerEnabled)
+                    {
+                        UpdatePlaylistPlayOrder(sourceFileUrl, config);
+                    }
                     break;
             }
         }
@@ -88,9 +94,83 @@ namespace MusicBeePlugin
             config = Config.LoadFromPath(configPath);
 
             LoadManualDescendingPlaylists();
+            InitializeFileListener();
 
             mbApi.MB_RegisterCommand("Auto Update Playlist Order: Open Configuration", (a, b) => Configure(IntPtr.Zero));
             mbApi.MB_RegisterCommand("Auto Update Playlist Order: Update All Playlists", (a, b) => UpdatePlaylistsAll(config));
+        }
+
+        private void InitializeFileListener()
+        {
+            if (m3uWatcher != null)
+            {
+                m3uWatcher.EnableRaisingEvents = false;
+                m3uWatcher.Dispose();
+                m3uWatcher = null;
+            }
+
+            if (config.M3uFileListenerEnabled)
+            {
+                var allPlaylists = GetAllPlaylists();
+                var m3uPaths = allPlaylists
+                    .Where(p => p.Path.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase) || p.Path.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase))
+                    .Select(p => p.Path)
+                    .ToList();
+
+                string commonRoot = GetCommonRootPath(m3uPaths);
+
+                if (!string.IsNullOrEmpty(commonRoot) && Directory.Exists(commonRoot))
+                {
+                    m3uWatcher = new FileSystemWatcher(commonRoot);
+                    m3uWatcher.IncludeSubdirectories = true;
+                    m3uWatcher.Filter = "*.*"; 
+                    // We filter in the event handler to support multiple extensions or use specific filter if possible. 
+                    // FSW only supports one filter string. We can just watch all and filter in code, or typically just "*.m3u*".
+                    
+                    m3uWatcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.CreationTime;
+                    m3uWatcher.Changed += OnM3uFileChanged;
+                    m3uWatcher.Created += OnM3uFileChanged;
+                    m3uWatcher.EnableRaisingEvents = true;
+                }
+            }
+        }
+
+        private void OnM3uFileChanged(object sender, FileSystemEventArgs e)
+        {
+            if (!e.Name.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase) && !e.Name.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            Console.WriteLine($"Detected change in file {e.Name}");
+            // Map file path to playlist URL/Name
+            var allPlaylists = GetAllPlaylists();
+            var playlist = allPlaylists.FirstOrDefault(p => p.Path.Equals(e.FullPath, StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrEmpty(playlist.Path))
+            {
+                UpdatePlaylistPlayOrder(playlist.Path, config);
+            }
+        }
+
+        public static string GetCommonRootPath(List<string> paths)
+        {
+            if (paths == null || paths.Count == 0) return string.Empty;
+
+            string common = Path.GetDirectoryName(paths[0]);
+
+            foreach (string path in paths.Skip(1))
+            {
+                while (!string.IsNullOrEmpty(common))
+                {
+                    if (path.StartsWith(common, StringComparison.OrdinalIgnoreCase) &&
+                        (path.Length == common.Length || path[common.Length] == Path.DirectorySeparatorChar || common.EndsWith(Path.DirectorySeparatorChar.ToString())))
+                    {
+                        break;
+                    }
+                    common = Path.GetDirectoryName(common);
+                }
+                if (string.IsNullOrEmpty(common)) break;
+            }
+            return common ?? string.Empty;
         }
 
         private void LoadManualDescendingPlaylists()
@@ -137,6 +217,11 @@ namespace MusicBeePlugin
                             Config.SaveConfig(newConfig, configPath);
                             
                             config = newConfig;
+
+                            if (oldConfig.M3uFileListenerEnabled != newConfig.M3uFileListenerEnabled)
+                            {
+                                InitializeFileListener();
+                            }
 
                             var changedPlaylists = newConfig.GetModifiedPlaylists(oldConfig);
                             UpdatePlaylistsChanged(oldConfig, newConfig, changedPlaylists);
@@ -228,28 +313,34 @@ namespace MusicBeePlugin
 
             if (!force && DEBOUNCE_MS > 0)
             {
-                if (debouncedTimers.TryGetValue(playlistName, out var existingTimer))
+                lock (debouncedTimers)
                 {
-                    existingTimer.Dispose();
-                }
-
-                var timer = new System.Threading.Timer(_ =>
-                {
-                    try 
+                    if (debouncedTimers.TryGetValue(playlistName, out var existingTimer))
                     {
-                        ProcessWithErrorHandling();
+                        existingTimer.Dispose();
                     }
-                    finally
+
+                    var timer = new System.Threading.Timer(_ =>
                     {
-                        if (debouncedTimers.TryGetValue(playlistName, out var t))
+                        try 
                         {
-                            t.Dispose();
-                            debouncedTimers.Remove(playlistName);
+                            ProcessWithErrorHandling();
                         }
-                    }
-                }, null, DEBOUNCE_MS, System.Threading.Timeout.Infinite);
+                        finally
+                        {
+                            lock (debouncedTimers)
+                            {
+                                if (debouncedTimers.TryGetValue(playlistName, out var t))
+                                {
+                                    t.Dispose();
+                                    debouncedTimers.Remove(playlistName);
+                                }
+                            }
+                        }
+                    }, null, DEBOUNCE_MS, System.Threading.Timeout.Infinite);
 
-                debouncedTimers[playlistName] = timer;
+                    debouncedTimers[playlistName] = timer;
+                }
                 return;
             }
 

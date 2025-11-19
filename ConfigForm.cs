@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using System.IO;
 using static MusicBeePlugin.Plugin;
 
 namespace MusicBeePlugin
@@ -18,6 +19,7 @@ namespace MusicBeePlugin
         private Button okButton;
         private Button cancelButton;
         private Button updateButton;
+        private Button m3uSettingsButton;
 
         public ConfigForm(MusicBeeApiInterface api, Config config)
         {
@@ -37,6 +39,7 @@ namespace MusicBeePlugin
             this.okButton = new Button();
             this.cancelButton = new Button();
             this.updateButton = new Button();
+            this.m3uSettingsButton = new Button();
             this.SuspendLayout();
             // 
             // searchLabel
@@ -94,10 +97,22 @@ namespace MusicBeePlugin
             this.cancelButton.UseVisualStyleBackColor = true;
             this.cancelButton.Click += new EventHandler(this.CancelButton_Click);
             // 
+            // m3uSettingsButton
+            // 
+            this.m3uSettingsButton.Anchor = ((AnchorStyles)((AnchorStyles.Top | AnchorStyles.Left)));
+            this.m3uSettingsButton.Location = new Point(12, 11);
+            this.m3uSettingsButton.Name = "m3uSettingsButton";
+            this.m3uSettingsButton.Size = new Size(30, 23);
+            this.m3uSettingsButton.TabIndex = 5;
+            this.m3uSettingsButton.Text = "⚙";
+            this.m3uSettingsButton.UseVisualStyleBackColor = true;
+            this.m3uSettingsButton.Click += new EventHandler(this.M3uSettingsButton_Click);
+            this.m3uSettingsButton.Visible = false;
+            // 
             // updateButton
             // 
             this.updateButton.Anchor = ((AnchorStyles)((AnchorStyles.Top | AnchorStyles.Left)));
-            this.updateButton.Location = new Point(12, 11);
+            this.updateButton.Location = new Point(48, 11);
             this.updateButton.Name = "updateButton";
             this.updateButton.Size = new Size(85, 23);
             this.updateButton.TabIndex = 3;
@@ -113,6 +128,7 @@ namespace MusicBeePlugin
             this.BackColor = Theme.FormBackColor;
             this.Controls.Add(searchLabel);
             this.Controls.Add(this.searchTextBox);
+            this.Controls.Add(this.m3uSettingsButton);
             this.Controls.Add(this.updateButton);
             this.Controls.Add(this.cancelButton);
             this.Controls.Add(this.okButton);
@@ -281,8 +297,40 @@ namespace MusicBeePlugin
             PopulatePlaylists();
         }
 
+        private void M3uSettingsButton_Click(object sender, EventArgs e)
+        {
+            var allPlaylists = GetAllPlaylists();
+            var m3uPaths = allPlaylists
+                .Where(p => p.Path.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase) || p.Path.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase))
+                .Select(p => p.Path)
+                .ToList();
+
+            string commonRoot = Plugin.GetCommonRootPath(m3uPaths);
+
+            using (var form = new M3uConfigForm(commonRoot, this.config))
+            {
+                if (form.ShowDialog(this) == DialogResult.OK)
+                {
+                    // Config updated in form
+                }
+            }
+        }
+
         private void ConfigForm_Load(object sender, EventArgs e)
         {
+            var allPlaylists = GetAllPlaylists();
+            bool hasM3u = allPlaylists.Any(p => p.Path.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase) || p.Path.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase));
+            
+            if (hasM3u)
+            {
+                m3uSettingsButton.Visible = true;
+                updateButton.Left = m3uSettingsButton.Right + 6;
+            }
+            else
+            {
+                m3uSettingsButton.Visible = false;
+                updateButton.Left = 12;
+            }
             // On initial load with a custom ClientSize, the Anchor properties are not yet applied.
             // We must manually calculate and set the final positions and sizes of anchored controls.
 

@@ -6,9 +6,7 @@ There are two primary reasons why you might need this plugin:
 
 ## Problem #1
 
-If you configured MusicBee to store playlists as M3U files instead of the proprietary MBP format (maybe because you want to sync playlists from elsewhere), it is not possible to set per-playlist sorting.
-
-This plugin allows you to configure sorting per-playlist when using M3U files.
+If you configured MusicBee to store playlists as M3U files instead of the proprietary MBP format (maybe because you want to sync playlists from elsewhere), it is not possible to set per-playlist sorting. It is also not possible to make MusicBee use forward slashes for these (non-exported) M3U playlists.
 
 ## Problem #2
 
@@ -31,8 +29,10 @@ This plugin allows you to define sorting rules for specific playlists. When a co
 
 This ensures that the play order is always what you expect, even when exported or synced.
 
-**Note:**
-* You will need to update your configuration whenever you rename the playlists.
+**Note:** You will need to update your configuration whenever you rename the playlists.
+
+**Filesystem watcher mode:**
+If you have configured your playlists to be stored in M3U format (e.g., syncing), then via the cogwheel in the settings page you can enable the file system watcher mode. In this mode, the plugin will detect and re-sort playlists even when they're modified externally. You can also enforce forward slashes for all M3U playlists to ensure cross-platform compatibility.
 
 ## Installation
 

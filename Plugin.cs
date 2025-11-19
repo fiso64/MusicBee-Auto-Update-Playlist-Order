@@ -19,6 +19,11 @@ namespace MusicBeePlugin
         private static bool isConfigOpen = false;
         private string configPath;
         private Config config = new Config();
+
+        // Locks
+        private readonly object _playlistIndexLock = new object();
+        private static readonly ConcurrentDictionary<string, object> _fileLocks = new ConcurrentDictionary<string, object>();
+
         private Dictionary<string, HashSet<string>> playlistIndex = new Dictionary<string, HashSet<string>>();
         private Dictionary<string, System.Threading.Timer> debouncedTimers = new Dictionary<string, System.Threading.Timer>();
         private ConcurrentDictionary<string, DateTime> fileWriteIgnoreList = new ConcurrentDictionary<string, DateTime>();
@@ -79,12 +84,7 @@ namespace MusicBeePlugin
                     break;
                 case NotificationType.PlaylistUpdated:
                 case NotificationType.PlaylistCreated:
-                    // If listener is enabled, we ignore MB events for playlists (to avoid loops/redundancy),
-                    // relying instead on the file system watcher.
-                    if (!config.M3uFileListenerEnabled)
-                    {
-                        UpdatePlaylistPlayOrder(sourceFileUrl, config);
-                    }
+                    UpdatePlaylistPlayOrder(sourceFileUrl, config);
                     break;
             }
         }
@@ -201,7 +201,10 @@ namespace MusicBeePlugin
                 {
                     if (QueryPlaylistFiles(playlistInfo.Path, out string[] files))
                     {
-                        playlistIndex[playlist.Key] = new HashSet<string>(files);
+                        lock (_playlistIndexLock)
+                        {
+                            playlistIndex[playlist.Key] = new HashSet<string>(files);
+                        }
                     }
                 }
             }
@@ -291,7 +294,10 @@ namespace MusicBeePlugin
                 {
                     if (QueryPlaylistFiles(playlistInfo.Path, out string[] files))
                     {
-                        playlistIndex[changed] = new HashSet<string>(files);
+                        lock (_playlistIndexLock)
+                        {
+                            playlistIndex[changed] = new HashSet<string>(files);
+                        }
                     }
                 }
             }
@@ -405,10 +411,17 @@ namespace MusicBeePlugin
             {
                 if (QueryPlaylistFiles(playlistUrl, out string[] currentFiles))
                 {
-                    var previousFiles = playlistIndex[playlistName];
-                    var newFiles = currentFiles.Where(f => !previousFiles.Contains(f)).ToArray();
+                    HashSet<string> previousFiles;
+                    lock (_playlistIndexLock)
+                    {
+                        if (!playlistIndex.TryGetValue(playlistName, out previousFiles))
+                        {
+                            previousFiles = new HashSet<string>();
+                        }
+                        playlistIndex[playlistName] = new HashSet<string>(currentFiles);
+                    }
 
-                    playlistIndex[playlistName] = new HashSet<string>(currentFiles);
+                    var newFiles = currentFiles.Where(f => !previousFiles.Contains(f)).ToArray();
 
                     if (newFiles.Any())
                     {
@@ -445,7 +458,10 @@ namespace MusicBeePlugin
             }
 
             var finalArray = finalFiles.ToArray();
-            playlistIndex[playlistName] = new HashSet<string>(finalArray);
+            lock (_playlistIndexLock)
+            {
+                playlistIndex[playlistName] = new HashSet<string>(finalArray);
+            }
             SetPlaylistFiles(playlistUrl, finalArray);
         }
 
@@ -496,69 +512,73 @@ namespace MusicBeePlugin
         {
             if (config.M3uFileListenerEnabled && (playlistPath.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase) || playlistPath.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase)))
             {
-                try
+                var fileLock = _fileLocks.GetOrAdd(playlistPath, _ => new object());
+                lock (fileLock)
                 {
-                    var encoding = System.Text.Encoding.Default;
-                    if (playlistPath.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase))
-                        encoding = System.Text.Encoding.UTF8;
-
-                    var newContentLines = new List<string>();
-
-                    if (config.M3uUseRelativePaths)
+                    try
                     {
-                        Uri playlistUri = new Uri(playlistPath);
-                        newContentLines.AddRange(files.Select(f =>
+                        var encoding = System.Text.Encoding.Default;
+                        if (playlistPath.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase))
+                            encoding = System.Text.Encoding.UTF8;
+
+                        var newContentLines = new List<string>();
+
+                        if (config.M3uUseRelativePaths)
                         {
-                            try
+                            Uri playlistUri = new Uri(playlistPath);
+                            newContentLines.AddRange(files.Select(f =>
                             {
-                                Uri fileUri = new Uri(f);
-                                Uri relativeUri = playlistUri.MakeRelativeUri(fileUri);
-                                if (relativeUri.IsAbsoluteUri)
+                                try
+                                {
+                                    Uri fileUri = new Uri(f);
+                                    Uri relativeUri = playlistUri.MakeRelativeUri(fileUri);
+                                    if (relativeUri.IsAbsoluteUri)
+                                    {
+                                        return f.Replace('\\', '/');
+                                    }
+                                    return Uri.UnescapeDataString(relativeUri.ToString());
+                                }
+                                catch
                                 {
                                     return f.Replace('\\', '/');
                                 }
-                                return Uri.UnescapeDataString(relativeUri.ToString());
-                            }
-                            catch
-                            {
-                                return f.Replace('\\', '/');
-                            }
-                        }));
-                    }
-                    else
-                    {
-                        newContentLines.AddRange(files.Select(f => f.Replace('\\', '/')));
-                    }
+                            }));
+                        }
+                        else
+                        {
+                            newContentLines.AddRange(files.Select(f => f.Replace('\\', '/')));
+                        }
 
-                    if (File.Exists(playlistPath))
-                    {
-                        var existingLines = File.ReadAllLines(playlistPath);
-                        var existingNonEmpty = existingLines.Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+                        if (File.Exists(playlistPath))
+                        {
+                            var existingLines = File.ReadAllLines(playlistPath);
+                            var existingNonEmpty = existingLines.Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
                         
-                        if (existingNonEmpty.SequenceEqual(newContentLines))
-                        {
-                            return true;
+                            if (existingNonEmpty.SequenceEqual(newContentLines))
+                            {
+                                return true;
+                            }
                         }
+
+                        // Register this file in the ignore list for the next second to suppress the FSW event
+                        // generated by this write operation.
+                        string fullPath = Path.GetFullPath(playlistPath);
+                        fileWriteIgnoreList[fullPath] = DateTime.Now.AddMilliseconds(1000);
+
+                        using (var sw = new StreamWriter(playlistPath, false, encoding))
+                        {
+                            foreach (var line in newContentLines)
+                            {
+                                sw.WriteLine(line);
+                            }
+                        }
+                        return true;
                     }
-
-                    // Register this file in the ignore list for the next second to suppress the FSW event
-                    // generated by this write operation.
-                    string fullPath = Path.GetFullPath(playlistPath);
-                    fileWriteIgnoreList[fullPath] = DateTime.Now.AddMilliseconds(1000);
-
-                    using (var sw = new StreamWriter(playlistPath, false, encoding))
+                    catch (Exception ex)
                     {
-                        foreach (var line in newContentLines)
-                        {
-                            sw.WriteLine(line);
-                        }
+                        Console.WriteLine($"Error writing M3U: {ex.Message}");
+                        return false;
                     }
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error writing M3U: {ex.Message}");
-                    return false;
                 }
             }
             return mbApi.Playlist_SetFiles(playlistPath, files);

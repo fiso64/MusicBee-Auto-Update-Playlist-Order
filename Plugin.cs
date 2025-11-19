@@ -19,6 +19,7 @@ namespace MusicBeePlugin
         private static bool isConfigOpen = false;
         private string configPath;
         private Config config = new Config();
+        private SynchronizationContext _uiContext;
 
         // Locks
         private readonly object _playlistIndexLock = new object();
@@ -91,6 +92,7 @@ namespace MusicBeePlugin
 
         private void Startup()
         {
+            _uiContext = SynchronizationContext.Current;
             var dataPath = mbApi.Setting_GetPersistentStoragePath();
             configPath = Path.Combine(dataPath, "mb_AutoUpdatePlayOrder", "config.json");
             config = Config.LoadFromPath(configPath);
@@ -160,13 +162,26 @@ namespace MusicBeePlugin
             }
 
             Console.WriteLine($"Detected change in file {e.Name}");
-            // Map file path to playlist URL/Name
-            var allPlaylists = GetAllPlaylists();
-            var playlist = allPlaylists.FirstOrDefault(p => p.Path.Equals(e.FullPath, StringComparison.OrdinalIgnoreCase));
 
-            if (!string.IsNullOrEmpty(playlist.Path))
+            void HandleChange()
             {
-                UpdatePlaylistPlayOrder(playlist.Path, config);
+                // Map file path to playlist URL/Name
+                var allPlaylists = GetAllPlaylists();
+                var playlist = allPlaylists.FirstOrDefault(p => p.Path.Equals(e.FullPath, StringComparison.OrdinalIgnoreCase));
+
+                if (!string.IsNullOrEmpty(playlist.Path))
+                {
+                    UpdatePlaylistPlayOrder(playlist.Path, config);
+                }
+            }
+
+            if (_uiContext != null)
+            {
+                _uiContext.Post(_ => HandleChange(), null);
+            }
+            else
+            {
+                HandleChange();
             }
         }
 
@@ -341,13 +356,25 @@ namespace MusicBeePlugin
                 //    }
                 //}
 
-                try
+                void DoProcess()
                 {
-                    ProcessPlaylistUpdate(url, config);
+                    try
+                    {
+                        ProcessPlaylistUpdate(url, config);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error processing playlist {playlistName}: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
                 }
-                catch (Exception ex)
+
+                if (_uiContext != null && SynchronizationContext.Current != _uiContext)
                 {
-                    MessageBox.Show($"Error processing playlist {playlistName}: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    _uiContext.Post(_ => DoProcess(), null);
+                }
+                else
+                {
+                    DoProcess();
                 }
             }
 
@@ -480,9 +507,9 @@ namespace MusicBeePlugin
                         var trimmed = line.Trim();
                         if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("#")) continue;
 
+                        string path = trimmed;
                         try
                         {
-                            string path = trimmed;
                             // Handle file URI if present
                             if (path.StartsWith("file:///", StringComparison.OrdinalIgnoreCase))
                             {
@@ -493,9 +520,14 @@ namespace MusicBeePlugin
                             {
                                 path = Path.GetFullPath(Path.Combine(dir, path));
                             }
-                            result.Add(path);
                         }
-                        catch { }
+                        catch 
+                        {
+                            // If path parsing fails (e.g. invalid characters), keep the original 
+                            // line to preserve data, even if we can't sort it correctly.
+                            path = trimmed; 
+                        }
+                        result.Add(path);
                     }
                     files = result.ToArray();
                     return true;

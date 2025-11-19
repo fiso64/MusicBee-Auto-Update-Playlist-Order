@@ -137,6 +137,7 @@ namespace MusicBeePlugin
                     m3uWatcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.CreationTime;
                     m3uWatcher.Changed += OnM3uFileChanged;
                     m3uWatcher.Created += OnM3uFileChanged;
+                    m3uWatcher.Renamed += (s, e) => OnM3uFileChanged(s, e);
                     m3uWatcher.EnableRaisingEvents = true;
                 }
             }
@@ -565,13 +566,41 @@ namespace MusicBeePlugin
                         string fullPath = Path.GetFullPath(playlistPath);
                         fileWriteIgnoreList[fullPath] = DateTime.Now.AddMilliseconds(1000);
 
-                        using (var sw = new StreamWriter(playlistPath, false, encoding))
+                        string tempPath = playlistPath + ".tmp";
+                        using (var sw = new StreamWriter(tempPath, false, encoding))
                         {
                             foreach (var line in newContentLines)
                             {
                                 sw.WriteLine(line);
                             }
                         }
+
+                        // True Atomic replacement
+                        if (File.Exists(playlistPath))
+                        {
+                            // File.Replace requires a backup file name. 
+                            // It swaps the files atomically: playlist -> backup, temp -> playlist
+                            string backupPath = playlistPath + "." + Guid.NewGuid().ToString("N") + ".bak";
+                            try
+                            {
+                                // ignoreMetadataErrors: true is safer for cross-filesystem moves or weird attribute states
+                                File.Replace(tempPath, playlistPath, backupPath, true);
+                                // If successful, delete the backup
+                                File.Delete(backupPath);
+                            }
+                            catch
+                            {
+                                // Fallback to delete/move if Replace fails (e.g. different volumes, though unlikely here)
+                                File.Delete(playlistPath);
+                                File.Move(tempPath, playlistPath);
+                            }
+                        }
+                        else
+                        {
+                            // No existing file, just move the temp one in
+                            File.Move(tempPath, playlistPath);
+                        }
+
                         return true;
                     }
                     catch (Exception ex)

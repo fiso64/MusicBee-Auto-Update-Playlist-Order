@@ -23,7 +23,7 @@ This plugin can automate this "Update Play Order" step whenever a playlist is mo
 
 ## How it works
 
-Go to **Preferences > Plugins**. Find "Auto Update Playlist Order" and click **Configure**.
+Go to **Preferences > Plugins**. Find "Playlist Sync & Sort Utils" and click **Configure**.
 
 This plugin allows you to define sorting rules for specific playlists. When a configured playlist is updated (tracks added or removed), the plugin will update the playlist's "natural play order".
 

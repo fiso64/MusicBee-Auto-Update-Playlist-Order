@@ -355,19 +355,24 @@ namespace MusicBeePlugin
         {
             string playlistName = mbApi.Playlist_GetName(playlistUrl);
 
+            // Logic for enforcing forward slashes on all M3Us
+            bool isM3u = playlistUrl.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase) || playlistUrl.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase);
+            bool shouldEnforceSlashes = config.M3uFileListenerEnabled && config.M3uEnforceForwardSlash && isM3u;
+
             if (!config.PlaylistConfig.TryGetValue(playlistName, out OrdersConfig orderConfig) &&
                 config.PlaylistConfig.TryGetValue("AllPlaylists", out OrdersConfig allPlaylistsConfig))
             {
                 orderConfig = allPlaylistsConfig;
             }
-            
-            if (orderConfig == null)
+
+            bool hasActiveOrder = orderConfig != null && orderConfig.Orders.Count > 0 && !orderConfig.IsManualNormal;
+            bool isManualDescending = orderConfig != null && orderConfig.IsManualDescending;
+
+            // If no sorting needed and not enforcing slashes, we are done
+            if (!hasActiveOrder && !isManualDescending && !shouldEnforceSlashes)
                 return;
 
-            if (orderConfig.Orders.Count == 0 || orderConfig.IsManualNormal)
-                return;
-
-            if (orderConfig.IsManualDescending)
+            if (isManualDescending)
             {
                 if (QueryPlaylistFiles(playlistUrl, out string[] currentFiles))
                 {
@@ -383,29 +388,36 @@ namespace MusicBeePlugin
                         var result = newFiles.Concat(existingFiles).ToList();
                         SetPlaylistFiles(playlistUrl, result.ToArray());
                     }
+                    else if (shouldEnforceSlashes)
+                    {
+                        // Even if no new files, we might need to fix slashes
+                        SetPlaylistFiles(playlistUrl, currentFiles);
+                    }
                 }
-                
                 return;
             }
 
-            Debug.WriteLine($"Updating playlist {playlistName} with sort order {orderConfig}");
+            Debug.WriteLine($"Processing playlist {playlistName}");
 
             if (!QueryPlaylistFiles(playlistUrl, out string[] files)) return;
             if (files == null || files.Length == 0) return;
 
-            IOrderedEnumerable<string> orderedFiles = null;
+            IEnumerable<string> finalFiles = files;
 
-            for (int i = 0; i < orderConfig.Orders.Count; i++)
+            if (hasActiveOrder)
             {
-                var sortOrder = orderConfig.Orders[i];
-                orderedFiles = ApplySortOrder(orderedFiles, files, sortOrder.Order, sortOrder.Descending);
+                IOrderedEnumerable<string> orderedFiles = null;
+                for (int i = 0; i < orderConfig.Orders.Count; i++)
+                {
+                    var sortOrder = orderConfig.Orders[i];
+                    orderedFiles = ApplySortOrder(orderedFiles, files, sortOrder.Order, sortOrder.Descending);
+                }
+                finalFiles = orderedFiles;
             }
 
-            if (orderedFiles != null)
-            {
-                playlistIndex[playlistName] = new HashSet<string>(orderedFiles);
-                SetPlaylistFiles(playlistUrl, orderedFiles.ToArray());
-            }
+            var finalArray = finalFiles.ToArray();
+            playlistIndex[playlistName] = new HashSet<string>(finalArray);
+            SetPlaylistFiles(playlistUrl, finalArray);
         }
 
         private bool QueryPlaylistFiles(string playlistPath, out string[] files)

@@ -10,6 +10,7 @@ namespace MusicBeePlugin
         private Config config;
         private CheckBox listenerCheckBox;
         private CheckBox relPathsCheckBox;
+        private CheckBox slashCheckBox;
 
         public M3uConfigForm(string rootPath, Config config)
         {
@@ -51,22 +52,31 @@ namespace MusicBeePlugin
             this.relPathsCheckBox.Enabled = listenerCheckBox.Checked && listenerCheckBox.Enabled;
             this.relPathsCheckBox.Width = 450;
 
+            this.slashCheckBox = new CheckBox();
+            this.slashCheckBox.AutoSize = true;
+            this.slashCheckBox.Location = new Point(23, 140);
+            this.slashCheckBox.Text = "Enforce forward slash for all M3U playlists";
+            this.slashCheckBox.Checked = config.M3uEnforceForwardSlash;
+            this.slashCheckBox.Enabled = listenerCheckBox.Checked && listenerCheckBox.Enabled;
+            this.slashCheckBox.Width = 450;
+
             var okButton = new Button();
             okButton.Text = "OK";
             okButton.DialogResult = DialogResult.OK;
-            okButton.Location = new Point(310, 140);
+            okButton.Location = new Point(310, 170);
             okButton.Click += OkButton_Click;
 
             var cancelButton = new Button();
             cancelButton.Text = "Cancel";
             cancelButton.DialogResult = DialogResult.Cancel;
-            cancelButton.Location = new Point(390, 140);
+            cancelButton.Location = new Point(390, 170);
 
-            this.ClientSize = new Size(500, 180);
+            this.ClientSize = new Size(500, 210);
             this.Controls.Add(infoLabel);
             this.Controls.Add(pathLabel);
             this.Controls.Add(this.listenerCheckBox);
             this.Controls.Add(this.relPathsCheckBox);
+            this.Controls.Add(this.slashCheckBox);
             this.Controls.Add(okButton);
             this.Controls.Add(cancelButton);
             
@@ -85,12 +95,14 @@ namespace MusicBeePlugin
         private void ListenerCheckBox_CheckedChanged(object sender, EventArgs e)
         {
             relPathsCheckBox.Enabled = listenerCheckBox.Checked;
+            slashCheckBox.Enabled = listenerCheckBox.Checked;
         }
 
         private void OkButton_Click(object sender, EventArgs e)
         {
             config.M3uFileListenerEnabled = listenerCheckBox.Checked;
             config.M3uUseRelativePaths = relPathsCheckBox.Checked;
+            config.M3uEnforceForwardSlash = slashCheckBox.Checked;
             this.Close();
         }
     }

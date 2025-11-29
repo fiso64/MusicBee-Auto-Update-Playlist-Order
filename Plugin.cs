@@ -173,6 +173,10 @@ namespace MusicBeePlugin
                 {
                     UpdatePlaylistPlayOrder(playlist.Path, config);
                 }
+                else if (File.Exists(e.FullPath))
+                {
+                    UpdatePlaylistPlayOrder(e.FullPath, config);
+                }
             }
 
             if (_uiContext != null)
@@ -341,6 +345,8 @@ namespace MusicBeePlugin
                 return;
 
             var playlistName = mbApi.Playlist_GetName(url);
+            if (string.IsNullOrEmpty(playlistName))
+                playlistName = Path.GetFileNameWithoutExtension(url);
 
             void ProcessWithErrorHandling()
             {
@@ -417,6 +423,8 @@ namespace MusicBeePlugin
         private void ProcessPlaylistUpdate(string playlistUrl, Config config)
         {
             string playlistName = mbApi.Playlist_GetName(playlistUrl);
+            if (string.IsNullOrEmpty(playlistName))
+                playlistName = Path.GetFileNameWithoutExtension(playlistUrl);
 
             // Logic for enforcing forward slashes on all M3Us
             bool isM3u = playlistUrl.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase) || playlistUrl.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase);

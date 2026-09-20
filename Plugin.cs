@@ -551,7 +551,7 @@ namespace MusicBeePlugin
                     try
                     {
                         var encoding = System.Text.Encoding.Default;
-                        if (playlistPath.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase))
+                        if (playlistPath.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase) || playlistPath.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase))
                             encoding = System.Text.Encoding.UTF8;
 
                         var newContentLines = new List<string>();
